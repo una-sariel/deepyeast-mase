@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Professor full-data guide:** [PROFESSOR_FULL_DATA.md](PROFESSOR_FULL_DATA.md)
+**Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)
 
 ## Pilot result (5%, seed=42)
 
@@ -13,7 +13,7 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | Official Keras DeepYeast | 76.8% | 80.6% |
 | **MaSE-Net Lite v2** | **82.0%** | **85.0%** |
 
-Mask coverage stays at **0.625** (top-k=40 / 64 patches). Full-data numbers: TBD (for professor run).
+Mask coverage stays at **0.625** (top-k=40 / 64 patches). Full-data numbers: TBD.
 
 ## Recommended script (Lite v2)
 
@@ -37,7 +37,7 @@ pytorch/
   train_mase.py           # Full MSMM backbone (GPU)
 artifacts/checkpoints_5pct/        # init .pt (Git LFS)
 results/                           # 5% summary JSON
-PROFESSOR_FULL_DATA.md             # Windows full-data steps
+FULL_DATA_QUICKSTART.md            # Windows full-data steps
 ```
 
 ## Requirements
