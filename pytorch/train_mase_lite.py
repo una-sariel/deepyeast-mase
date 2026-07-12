@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train Lite Triple Fusion v2 (longer + stronger reg + init + learnable ensemble)."""
+"""Train MaSE-Net Lite v2 (longer + stronger reg + init + learnable ensemble)."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ if str(_PYTORCH_DIR) not in sys.path:
   sys.path.insert(0, str(_PYTORCH_DIR))
 
 from dataset import make_loaders  # noqa: E402
-from triple_fusion_lite_net import (  # noqa: E402
-  TRIPLE_FUSION_LITE_DEFAULT,
-  TripleFusionLiteConfig,
-  TripleFusionLiteNet,
+from mase_lite_net import (  # noqa: E402
+  MASE_LITE_DEFAULT,
+  MaSELiteConfig,
+  MaSELiteNet,
   config_to_dict,
-  lite_fusion_loss,
+  mase_lite_loss,
   load_partial_state,
 )
 
@@ -42,7 +42,7 @@ def set_seed(seed: int) -> None:
 
 
 def run_epoch(
-  model: TripleFusionLiteNet,
+  model: MaSELiteNet,
   loader: DataLoader,
   device: torch.device,
   optimizer: torch.optim.Optimizer | None = None,
@@ -61,7 +61,7 @@ def run_epoch(
     if train:
       optimizer.zero_grad(set_to_none=True)
       ensemble, details = model(images, train=True, return_details=True)
-      loss = lite_fusion_loss(
+      loss = mase_lite_loss(
         details,
         labels,
         mask_sparsity_weight=mask_sparsity_weight,
@@ -73,7 +73,7 @@ def run_epoch(
     else:
       with torch.inference_mode():
         ensemble, details = model(images, train=False, return_details=True)
-        loss = lite_fusion_loss(
+        loss = mase_lite_loss(
           details,
           labels,
           mask_sparsity_weight=mask_sparsity_weight,
@@ -111,7 +111,7 @@ def resolve_default_init(name: str) -> Path | None:
 
 def main() -> None:
   parser = argparse.ArgumentParser(
-    description="Train Lite Triple Fusion v2 (optimized recipe)"
+    description="Train MaSE-Net Lite v2 (optimized recipe)"
   )
   parser.add_argument("--data-dir", type=Path, default=Path("../deepyeast_full"))
   parser.add_argument("--epochs", type=int, default=60)
@@ -148,7 +148,7 @@ def main() -> None:
   parser.add_argument(
     "--checkpoint-name",
     type=str,
-    default="triple_fusion_lite_full_v2",
+    default="mase_lite_full_v2",
   )
   args = parser.parse_args()
 
@@ -157,9 +157,9 @@ def main() -> None:
   data_dir = args.data_dir.resolve()
   ckpt_dir = data_dir / "checkpoints" / args.checkpoint_name
 
-  config = TripleFusionLiteConfig(
+  config = MaSELiteConfig(
     **{
-      **config_to_dict(TRIPLE_FUSION_LITE_DEFAULT),
+      **config_to_dict(MASE_LITE_DEFAULT),
       "top_k_patches": args.top_k,
       "soft_mask_alpha": args.soft_alpha,
       "branch_dropout": args.branch_dropout,
@@ -168,7 +168,7 @@ def main() -> None:
       "ensemble_temperature": args.ensemble_temperature,
     }
   )
-  model = TripleFusionLiteNet(config).to(device)
+  model = MaSELiteNet(config).to(device)
 
   init_info: dict[str, Any] = {}
   if not args.no_init:
@@ -231,7 +231,7 @@ def main() -> None:
   expected_cov = args.top_k / 64.0
   n_params = sum(p.numel() for p in model.parameters())
   print(
-    f"Triple Fusion Lite v2 | device={device} | params={n_params:,} | "
+    f"MaSE-Net Lite v2 | device={device} | params={n_params:,} | "
     f"top_k={args.top_k} (mask~{expected_cov:.3f}) | "
     f"epochs={args.epochs} patience={args.patience} | "
     f"ls={args.label_smoothing} sparse_w={args.mask_sparsity_weight}",
@@ -251,7 +251,7 @@ def main() -> None:
   best_state: dict[str, torch.Tensor] | None = None
   t0 = time.time()
 
-  for epoch in tqdm(range(args.epochs), desc="TripleFusionLiteV2", mininterval=5):
+  for epoch in tqdm(range(args.epochs), desc="MaSELiteV2", mininterval=5):
     train_m = run_epoch(
       model,
       train_loader,
@@ -324,7 +324,7 @@ def main() -> None:
 
   elapsed = time.time() - t0
   results = {
-    "method": "triple_fusion_lite_v2",
+    "method": "mase_lite_v2",
     "framework": "pytorch",
     "config": config_to_dict(config),
     "optimizations": {
@@ -368,7 +368,7 @@ def main() -> None:
       indent=2,
     )
 
-  print("\n=== Triple Fusion Lite v2 done ===", flush=True)
+  print("\n=== MaSE-Net Lite v2 done ===", flush=True)
   print(f"Best val: {best_val:.4f} @ epoch {best_epoch}", flush=True)
   print(
     f"Test:     {test_m['accuracy']:.4f}  "

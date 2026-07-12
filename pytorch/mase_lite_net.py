@@ -1,4 +1,4 @@
-"""Lite Triple Fusion for CPU / 10% pilots (v2: learnable ensemble + stronger reg).
+"""MaSE-Net Lite for CPU / 10% pilots (v2: learnable ensemble + stronger reg).
 
   Masked  — ViT patch selector, hard top-k + soft α + sparsity regularizer
   PLCNN   — VGG / ResNet / DenseNet diversity + SE + higher dropout
@@ -30,14 +30,14 @@ from plcnn_triple_net import (
 
 
 @dataclass
-class TripleFusionLiteConfig(MaskedModelConfig):
+class MaSELiteConfig(MaskedModelConfig):
   branch_dropout: float = 0.4
   head_dropout: float = 0.5
   learnable_ensemble: bool = True
   ensemble_temperature: float = 1.0
 
 
-TRIPLE_FUSION_LITE_DEFAULT = TripleFusionLiteConfig(
+MASE_LITE_DEFAULT = MaSELiteConfig(
   top_k_patches=40,
   soft_mask_alpha=0.5,
   selector_layers=2,
@@ -48,12 +48,12 @@ TRIPLE_FUSION_LITE_DEFAULT = TripleFusionLiteConfig(
 )
 
 
-class TripleFusionLiteNet(nn.Module):
+class MaSELiteNet(nn.Module):
   """Masked PLCNN branches + MSMM-style multi-head ensemble."""
 
-  def __init__(self, config: TripleFusionLiteConfig | None = None) -> None:
+  def __init__(self, config: MaSELiteConfig | None = None) -> None:
     super().__init__()
-    self.config = config or TRIPLE_FUSION_LITE_DEFAULT
+    self.config = config or MASE_LITE_DEFAULT
     cfg = self.config
     self.selector = PatchRegionSelector(cfg)
     self.branch_vgg = VGGBranch(dropout=cfg.branch_dropout)
@@ -138,7 +138,7 @@ class TripleFusionLiteNet(nn.Module):
     return ensemble
 
 
-def lite_fusion_loss(
+def mase_lite_loss(
   details: dict,
   labels: torch.Tensor,
   mask_sparsity_weight: float = 0.0,
@@ -158,7 +158,7 @@ def lite_fusion_loss(
 
 
 def load_partial_state(
-  model: TripleFusionLiteNet,
+  model: MaSELiteNet,
   checkpoint_path: Path,
   prefixes: tuple[str, ...] | None = None,
 ) -> list[str]:
@@ -178,5 +178,5 @@ def load_partial_state(
   return loaded
 
 
-def config_to_dict(config: TripleFusionLiteConfig) -> dict:
+def config_to_dict(config: MaSELiteConfig) -> dict:
   return asdict(config)

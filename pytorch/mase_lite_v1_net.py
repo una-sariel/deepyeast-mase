@@ -1,12 +1,12 @@
-"""Lite Triple Fusion v1 (pre-optimization baseline).
+"""MaSE-Net Lite v1 (pre-optimization baseline).
 
   Masked  — ViT patch selector, hard top-k + soft α
   PLCNN   — VGG / ResNet / DenseNet diversity + SE vector heads + dropout
   MSMM    — progressive multi-head softmax ensemble (uniform mean)
 
 This is the architecture that reached ~84.4% test on 10% data
-(checkpoint: triple_fusion_lite_10pct). For the optimized recipe see
-triple_fusion_lite_net.py + train_triple_fusion_lite.py (v2).
+(checkpoint: mase_lite_10pct). For the optimized recipe see
+mase_lite_net.py + train_mase_lite.py (v2).
 """
 
 from __future__ import annotations
@@ -33,12 +33,12 @@ from plcnn_triple_net import (
 
 
 @dataclass
-class TripleFusionLiteV1Config(MaskedModelConfig):
+class MaSELiteV1Config(MaskedModelConfig):
   branch_dropout: float = 0.3
   head_dropout: float = 0.5
 
 
-TRIPLE_FUSION_LITE_V1_DEFAULT = TripleFusionLiteV1Config(
+MASE_LITE_V1_DEFAULT = MaSELiteV1Config(
   top_k_patches=38,
   soft_mask_alpha=0.5,
   selector_layers=2,
@@ -47,12 +47,12 @@ TRIPLE_FUSION_LITE_V1_DEFAULT = TripleFusionLiteV1Config(
 )
 
 
-class TripleFusionLiteV1Net(nn.Module):
+class MaSELiteV1Net(nn.Module):
   """Masked PLCNN branches + uniform MSMM-style 4-head ensemble (v1)."""
 
-  def __init__(self, config: TripleFusionLiteV1Config | None = None) -> None:
+  def __init__(self, config: MaSELiteV1Config | None = None) -> None:
     super().__init__()
-    self.config = config or TRIPLE_FUSION_LITE_V1_DEFAULT
+    self.config = config or MASE_LITE_V1_DEFAULT
     cfg = self.config
     self.selector = PatchRegionSelector(cfg)
     self.branch_vgg = VGGBranch(dropout=cfg.branch_dropout)
@@ -123,7 +123,7 @@ class TripleFusionLiteV1Net(nn.Module):
     return ensemble
 
 
-def lite_fusion_v1_loss(
+def mase_lite_v1_loss(
   details: dict,
   labels: torch.Tensor,
   mask_sparsity_weight: float = 0.0,
@@ -140,5 +140,5 @@ def lite_fusion_v1_loss(
   return loss
 
 
-def config_to_dict(config: TripleFusionLiteV1Config) -> dict:
+def config_to_dict(config: MaSELiteV1Config) -> dict:
   return asdict(config)

@@ -1,5 +1,5 @@
 {
-  "method": "triple_fusion_lite_v2",
+  "method": "mase_lite_v2",
   "framework": "pytorch",
   "data": "DeepYeast 5% stratified, seed=42",
   "params": 7025795,

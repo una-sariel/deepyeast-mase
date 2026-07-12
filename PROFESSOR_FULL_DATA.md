@@ -1,6 +1,8 @@
-# Triple Fusion — Full Data Quick Start (Windows)
+# MaSE-Net — Full Data Quick Start (Windows)
 
-**Repo:** https://github.com/una-sariel/deepyeast-triple-fusion  
+**MaSE-Net** = **M**asked **S**elective **E**nsemble Network  
+
+**Repo:** https://github.com/una-sariel/deepyeast-mase  
 **Method:** Masked selector + PLCNN (VGG/ResNet/DenseNet) + 4-head ensemble  
 **Framework:** PyTorch only (no JAX / no TensorFlow for training)  
 **Python:** 3.11 or 3.12  
@@ -38,8 +40,8 @@ Install [Git LFS](https://git-lfs.com) first (needed for init checkpoints ~70 MB
 ```powershell
 cd C:\dy
 git lfs install
-git clone https://github.com/una-sariel/deepyeast-triple-fusion.git
-cd deepyeast-triple-fusion
+git clone https://github.com/una-sariel/deepyeast-mase.git
+cd deepyeast-mase
 git lfs pull
 
 python -m venv .venv
@@ -71,7 +73,7 @@ python -c "import torch; print(torch.__version__, 'cuda=', torch.cuda.is_availab
 ```powershell
 python prepare_deepyeast_subset.py --fraction 0.05 --out-dir deepyeast_5pct --seed 42
 
-python pytorch\train_triple_fusion_lite.py `
+python pytorch\train_mase_lite.py `
   --data-dir deepyeast_5pct `
   --epochs 1 --patience 0 --batch-size 32 `
   --checkpoint-name smoke_test
@@ -86,10 +88,10 @@ Expect a `results.json` under `deepyeast_5pct\checkpoints\smoke_test\`.
 Same hyperparameters as the 5% run that reached **85.0% test**.
 
 ```powershell
-cd C:\dy\deepyeast-triple-fusion
+cd C:\dy\deepyeast-mase
 .venv\Scripts\activate
 
-python pytorch\train_triple_fusion_lite.py `
+python pytorch\train_mase_lite.py `
   --data-dir "D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full" `
   --epochs 60 `
   --patience 15 `
@@ -99,7 +101,7 @@ python pytorch\train_triple_fusion_lite.py `
   --mask-sparsity-weight 0.05 `
   --label-smoothing 0.1 `
   --seed 42 `
-  --checkpoint-name triple_fusion_lite_full_v2
+  --checkpoint-name mase_lite_full_v2
 ```
 
 Replace the `--data-dir` path with your actual `deepyeast_full` folder.
@@ -108,17 +110,17 @@ Replace the `--data-dir` path with your actual `deepyeast_full` folder.
 
 | Item | Setting |
 |------|---------|
-| Architecture | Lite Triple Fusion v2 (~7M params) |
+| Architecture | MaSE-Net Lite v2 (~7M params) |
 | Mask | hard top-k=40 → coverage **0.625** |
 | Init | `artifacts/checkpoints_5pct/plcnn_triple` + `masked_v3k60_pytorch` (auto) |
 | Regularization | strong augment, label smoothing 0.1, sparsity 0.05, dropout |
 | Early stop | patience 15 on val accuracy |
-| Output | `deepyeast_full\checkpoints\triple_fusion_lite_full_v2\` |
+| Output | `deepyeast_full\checkpoints\mase_lite_full_v2\` |
 
 ### Outputs to send back
 
 ```text
-...\checkpoints\triple_fusion_lite_full_v2\
+...\checkpoints\mase_lite_full_v2\
   results.json     ← best_val_accuracy + test.accuracy
   best.pt
   train.log        (if you tee the console)
@@ -138,42 +140,42 @@ Key fields in `results.json`:
 ### A) No init (train from scratch)
 
 ```powershell
-python pytorch\train_triple_fusion_lite.py `
+python pytorch\train_mase_lite.py `
   --data-dir "YOUR\deepyeast_full" `
   --no-init `
   --epochs 60 --patience 15 --top-k 40 `
   --mask-sparsity-weight 0.05 --label-smoothing 0.1 `
-  --seed 42 --checkpoint-name triple_fusion_lite_full_v2_noinit
+  --seed 42 --checkpoint-name mase_lite_full_v2_noinit
 ```
 
 ### B) Full MSMM backbone (needs GPU; slower / heavier)
 
 ```powershell
-python pytorch\train_triple_fusion.py `
+python pytorch\train_mase.py `
   --data-dir "YOUR\deepyeast_full" `
   --epochs 50 --patience 10 --top-k 38 `
-  --seed 42 --checkpoint-name triple_fusion_full
+  --seed 42 --checkpoint-name mase_full
 ```
 
 ### C) Lite v1 baseline (no PLCNN/selector init)
 
 ```powershell
-python pytorch\train_triple_fusion_lite_v1.py `
+python pytorch\train_mase_lite_v1.py `
   --data-dir "YOUR\deepyeast_full" `
   --epochs 30 --patience 8 --top-k 38 `
-  --seed 42 --checkpoint-name triple_fusion_lite_full_v1
+  --seed 42 --checkpoint-name mase_lite_full_v1
 ```
 
 ---
 
 ## Comparison context (for reporting)
 
-| Setting | Official Keras | Masked v5full (prior) | Triple Fusion Lite v2 |
+| Setting | Official Keras | Masked v5full (prior) | MaSE-Net Lite v2 |
 |---------|----------------|------------------------|------------------------|
 | 5% test | 80.6% | — | **85.0%** |
 | Full test | **88.4%** | 87.5% | **please fill** |
 
-Goal: see whether Triple Fusion beats Keras **88.4%** on full data.
+Goal: see whether MaSE-Net beats Keras **88.4%** on full data.
 
 ---
 

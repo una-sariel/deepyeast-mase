@@ -1,4 +1,4 @@
-"""Triple fusion: Masked selector + MSMM multi-scale ensemble + PLCNN branches.
+"""MaSE-Net (Masked Selective Ensemble): Masked selector + MSMM + PLCNN branches.
 
 Design (advantages from each paper line):
   Masked  — ViT patch selector, hard top-k + soft α blend (focus on informative regions)
@@ -31,14 +31,14 @@ from plcnn_triple_net import PLCNNTripleNet
 
 
 @dataclass
-class TripleFusionConfig(MaskedModelConfig):
+class MaSEConfig(MaskedModelConfig):
   """Mask hyper-params; backbones use their own defaults."""
 
   plcnn_dropout: float = 0.5
 
 
 # Default for 10% pilot: ~60% patch keep, soft blend, Keras-style mask recipe
-TRIPLE_FUSION_DEFAULT = TripleFusionConfig(
+MASE_DEFAULT = MaSEConfig(
   top_k_patches=38,
   soft_mask_alpha=0.5,
   selector_layers=2,
@@ -46,12 +46,12 @@ TRIPLE_FUSION_DEFAULT = TripleFusionConfig(
 )
 
 
-class TripleFusionNet(nn.Module):
+class MaSENet(nn.Module):
   """Masked input → MSMM ensemble ⊕ PLCNN triple → probability average."""
 
-  def __init__(self, config: TripleFusionConfig | None = None) -> None:
+  def __init__(self, config: MaSEConfig | None = None) -> None:
     super().__init__()
-    self.config = config or TRIPLE_FUSION_DEFAULT
+    self.config = config or MASE_DEFAULT
     self.selector = PatchRegionSelector(self.config)
     self.msmm = MSMMResNet34(num_classes=self.config.num_classes)
     self.plcnn = PLCNNTripleNet(
@@ -106,7 +106,7 @@ class TripleFusionNet(nn.Module):
     return fused_logits
 
 
-def triple_fusion_loss(
+def mase_loss(
   details: dict,
   labels: torch.Tensor,
   mask_sparsity_weight: float = 0.0,
@@ -125,5 +125,5 @@ def triple_fusion_loss(
   return loss
 
 
-def config_to_dict(config: TripleFusionConfig) -> dict:
+def config_to_dict(config: MaSEConfig) -> dict:
   return asdict(config)

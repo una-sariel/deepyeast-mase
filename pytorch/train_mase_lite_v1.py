@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train Triple Fusion (Masked + MSMM + PLCNN) on DeepYeast subset."""
+"""Train MaSE-Net Lite v1 (pre-optimization baseline, ~84.4% test on 10%)."""
 
 from __future__ import annotations
 
@@ -21,12 +21,12 @@ if str(_REPO_ROOT / "pytorch") not in sys.path:
   sys.path.insert(0, str(_REPO_ROOT / "pytorch"))
 
 from dataset import make_loaders  # noqa: E402
-from triple_fusion_net import (  # noqa: E402
-  TRIPLE_FUSION_DEFAULT,
-  TripleFusionConfig,
-  TripleFusionNet,
+from mase_lite_v1_net import (  # noqa: E402
+  MASE_LITE_V1_DEFAULT,
+  MaSELiteV1Config,
+  MaSELiteV1Net,
   config_to_dict,
-  triple_fusion_loss,
+  mase_lite_v1_loss,
 )
 
 
@@ -39,7 +39,7 @@ def set_seed(seed: int) -> None:
 
 
 def run_epoch(
-  model: TripleFusionNet,
+  model: MaSELiteV1Net,
   loader: DataLoader,
   device: torch.device,
   optimizer: torch.optim.Optimizer | None = None,
@@ -56,8 +56,8 @@ def run_epoch(
 
     if train:
       optimizer.zero_grad(set_to_none=True)
-      fused_logits, details = model(images, train=True, return_details=True)
-      loss = triple_fusion_loss(
+      ensemble, details = model(images, train=True, return_details=True)
+      loss = mase_lite_v1_loss(
         details,
         labels,
         mask_sparsity_weight=mask_sparsity_weight,
@@ -67,15 +67,15 @@ def run_epoch(
       optimizer.step()
     else:
       with torch.inference_mode():
-        fused_logits, details = model(images, train=False, return_details=True)
-        loss = triple_fusion_loss(
+        ensemble, details = model(images, train=False, return_details=True)
+        loss = mase_lite_v1_loss(
           details,
           labels,
           mask_sparsity_weight=mask_sparsity_weight,
           target_mask_fraction=target_mask_fraction,
         )
 
-    acc = (fused_logits.argmax(dim=-1) == labels).float().mean().item()
+    acc = (ensemble.argmax(dim=-1) == labels).float().mean().item()
     losses.append(float(loss.item()))
     accs.append(acc)
     coverages.append(float(details["mask"].mean().item()))
@@ -89,11 +89,11 @@ def run_epoch(
 
 def main() -> None:
   parser = argparse.ArgumentParser(
-    description="Train Triple Fusion: Masked + MSMM + PLCNN"
+    description="Train MaSE-Net Lite v1 (baseline before optimizations)"
   )
   parser.add_argument("--data-dir", type=Path, default=Path("../deepyeast_10pct"))
   parser.add_argument("--epochs", type=int, default=30)
-  parser.add_argument("--batch-size", type=int, default=32)
+  parser.add_argument("--batch-size", type=int, default=64)
   parser.add_argument("--selector-lr", type=float, default=3e-3)
   parser.add_argument("--backbone-lr", type=float, default=1e-3)
   parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -101,14 +101,13 @@ def main() -> None:
   parser.add_argument("--seed", type=int, default=42)
   parser.add_argument("--top-k", type=int, default=38)
   parser.add_argument("--soft-alpha", type=float, default=0.5)
-  parser.add_argument("--dropout", type=float, default=0.5)
   parser.add_argument("--mask-sparsity-weight", type=float, default=0.0)
   parser.add_argument("--num-workers", type=int, default=0)
   parser.add_argument("--no-augment", action="store_true")
   parser.add_argument(
     "--checkpoint-name",
     type=str,
-    default="triple_fusion_10pct",
+    default="mase_lite_10pct",
   )
   args = parser.parse_args()
 
@@ -117,21 +116,25 @@ def main() -> None:
   data_dir = args.data_dir.resolve()
   ckpt_dir = data_dir / "checkpoints" / args.checkpoint_name
 
-  config = TripleFusionConfig(
+  config = MaSELiteV1Config(
     **{
-      **config_to_dict(TRIPLE_FUSION_DEFAULT),
+      **config_to_dict(MASE_LITE_V1_DEFAULT),
       "top_k_patches": args.top_k,
       "soft_mask_alpha": args.soft_alpha,
-      "plcnn_dropout": args.dropout,
     }
   )
-  model = TripleFusionNet(config).to(device)
+  model = MaSELiteV1Net(config).to(device)
 
   optimizer = torch.optim.Adam(
     [
       {"params": model.selector.parameters(), "lr": args.selector_lr},
-      {"params": model.msmm.parameters(), "lr": args.backbone_lr},
-      {"params": model.plcnn.parameters(), "lr": args.backbone_lr},
+      {
+        "params": list(model.branch_vgg.parameters())
+        + list(model.branch_resnet.parameters())
+        + list(model.branch_densenet.parameters())
+        + list(model.heads.parameters()),
+        "lr": args.backbone_lr,
+      },
     ],
     weight_decay=args.weight_decay,
   )
@@ -143,20 +146,23 @@ def main() -> None:
     data_dir,
     batch_size=args.batch_size,
     augment=not args.no_augment,
+    strong_augment=False,
     num_workers=args.num_workers,
   )
 
   expected_cov = args.top_k / 64.0
   n_params = sum(p.numel() for p in model.parameters())
   print(
-    f"Triple Fusion | device={device} | params={n_params:,} | "
+    f"MaSE-Net Lite v1 | device={device} | params={n_params:,} | "
     f"top_k={args.top_k} (mask~{expected_cov:.3f}) | "
-    f"epochs={args.epochs} | data={data_dir}"
+    f"epochs={args.epochs} | data={data_dir}",
+    flush=True,
   )
   print(
     f"  train={len(train_loader.dataset)} "
     f"val={len(val_loader.dataset)} "
-    f"test={len(test_loader.dataset)}"
+    f"test={len(test_loader.dataset)}",
+    flush=True,
   )
 
   history: list[dict[str, Any]] = []
@@ -166,7 +172,7 @@ def main() -> None:
   best_state: dict[str, torch.Tensor] | None = None
   t0 = time.time()
 
-  for epoch in tqdm(range(args.epochs), desc="Triple Fusion"):
+  for epoch in tqdm(range(args.epochs), desc="MaSELiteV1", mininterval=5):
     train_m = run_epoch(
       model,
       train_loader,
@@ -197,7 +203,8 @@ def main() -> None:
       f"train={train_m['accuracy']:.3f}  "
       f"val={val_m['accuracy']:.3f}  "
       f"mask={val_m['mask_coverage']:.3f}  "
-      f"loss={val_m['loss']:.4f}"
+      f"loss={val_m['loss']:.4f}",
+      flush=True,
     )
 
     if val_m["accuracy"] > best_val:
@@ -210,7 +217,11 @@ def main() -> None:
     else:
       patience_counter += 1
       if patience_counter >= args.patience:
-        print(f"Early stop @ epoch {epoch + 1} (best val={best_val:.4f} @ {best_epoch})")
+        print(
+          f"Early stop @ epoch {epoch + 1} "
+          f"(best val={best_val:.4f} @ {best_epoch})",
+          flush=True,
+        )
         break
 
   if best_state is not None:
@@ -227,7 +238,7 @@ def main() -> None:
 
   elapsed = time.time() - t0
   results = {
-    "method": "triple_fusion_masked_msmm_plcnn",
+    "method": "mase_lite_v1",
     "framework": "pytorch",
     "config": config_to_dict(config),
     "params": n_params,
@@ -238,6 +249,10 @@ def main() -> None:
     "history": history,
     "data_dir": str(data_dir),
     "seed": args.seed,
+    "note": (
+      "v1 baseline: random init, flip-only aug, uniform 4-head mean, "
+      "30 epochs / patience 8. Reported ~84.4% test on 10% subset."
+    ),
   }
   ckpt_dir.mkdir(parents=True, exist_ok=True)
   with (ckpt_dir / "results.json").open("w") as f:
@@ -246,22 +261,28 @@ def main() -> None:
     json.dump(
       {
         "method": results["method"],
-        "components": ["PatchRegionSelector", "MSMMResNet34", "PLCNNTripleNet"],
-        "fusion": "mean(softmax(MSMM), softmax(PLCNN))",
+        "version": "v1",
+        "components": [
+          "PatchRegionSelector",
+          "PLCNN VGG/ResNet/DenseNet",
+          "MSMM progressive 4-head uniform ensemble",
+        ],
+        "fusion": "mean(softmax(head_i))",
         "config": config_to_dict(config),
       },
       f,
       indent=2,
     )
 
-  print("\n=== Triple Fusion done ===")
-  print(f"Best val: {best_val:.4f} @ epoch {best_epoch}")
+  print("\n=== MaSE-Net Lite v1 done ===", flush=True)
+  print(f"Best val: {best_val:.4f} @ epoch {best_epoch}", flush=True)
   print(
     f"Test:     {test_m['accuracy']:.4f}  "
-    f"(mask={test_m['mask_coverage']:.3f})"
+    f"(mask={test_m['mask_coverage']:.3f})",
+    flush=True,
   )
-  print(f"Elapsed:  {elapsed / 60:.1f} min")
-  print(f"Saved:    {ckpt_dir}")
+  print(f"Elapsed:  {elapsed / 60:.1f} min", flush=True)
+  print(f"Saved:    {ckpt_dir}", flush=True)
 
 
 if __name__ == "__main__":
