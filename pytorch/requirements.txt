@@ -1,0 +1,6 @@
+torch>=2.0.0
+numpy>=1.26.0
+pandas>=2.0.0
+Pillow>=10.0.0
+tqdm>=4.66.0
+# tensorflow only needed for export_keras_classifier.py (.h5 → .pt), not for training

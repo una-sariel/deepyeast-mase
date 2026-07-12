@@ -1,0 +1,31 @@
+{
+  "method": "triple_fusion_lite_v2",
+  "framework": "pytorch",
+  "data": "DeepYeast 5% stratified, seed=42",
+  "params": 7025795,
+  "best_epoch": 46,
+  "best_val_accuracy": 0.8204375028610229,
+  "test": {
+    "loss": 0.6814302563667297,
+    "accuracy": 0.8502992033958435,
+    "mask_coverage": 0.625,
+    "ensemble_weights": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ]
+  },
+  "optimizations": {
+    "epochs": 60,
+    "patience": 15,
+    "label_smoothing": 0.1,
+    "mask_sparsity_weight": 0.05,
+    "top_k": 40,
+    "strong_augment": true,
+    "learnable_ensemble": true,
+    "branch_dropout": 0.4,
+    "head_dropout": 0.5
+  },
+  "note": "Init used 5% plcnn_triple + masked_v3k60_pytorch (shipped under artifacts/)."
+}
