@@ -4,16 +4,26 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)
 
-## Pilot result (5%, seed=42)
+## Results
+
+### Full data (MaSE-Net Lite v2, seed=42, 5% init)
+
+| Metric | Value |
+|--------|-------|
+| **Test** | **89.1%** |
+| Val (best) | 89.4% @ epoch 57 |
+| vs. Keras baseline | **+0.7%** (88.4%) |
+
+### 5% pilot (seed=42)
 
 | Method | Val | Test |
 |--------|-----|------|
 | Official Keras DeepYeast | 76.8% | 80.6% |
-| **MaSE-Net Lite v2** | **82.0%** | **85.0%** |
+| **MaSE-Net Lite v2** | 82.0% | 85.0% |
 
-Mask coverage stays at **0.625** (top-k=40 / 64 patches). Full-data numbers: TBD.
+Mask coverage stays at **0.625** (top-k=40 / 64 patches). See [ARCHITECTURE.md](ARCHITECTURE.md) for the full pipeline.
 
 ## Recommended script (Lite v2)
 
@@ -37,6 +47,7 @@ pytorch/
   train_mase.py           # Full MSMM backbone (GPU)
 artifacts/checkpoints_5pct/        # init .pt (Git LFS)
 results/                           # 5% summary JSON
+ARCHITECTURE.md                    # Lite v2 architecture (English)
 FULL_DATA_QUICKSTART.md            # Windows full-data steps
 ```
 
