@@ -172,14 +172,26 @@ Each head produces logits → **softmax** → class probabilities `P_i`.
 A learnable vector `ensemble_logits ∈ ℝ⁴` defines mixture weights:
 
 ```
-w = softmax(ensemble_logits / temperature)     # temperature = 1.0
+w = softmax(ensemble_logits / temperature)     # optional floor min_w
 P_final = Σᵢ wᵢ · P_i
 output  = log(P_final)                         # for NLL / CE
 ```
 
-**v2 training objective (as shipped):** loss = **mean of per-head cross-entropy** + sparsity term.
+### v2 loss (legacy, `--legacy-v2-loss`)
 
-In practice, with this objective, `ensemble_logits` receive **no gradient**, so weights stay at the initialization **w = [0.25, 0.25, 0.25, 0.25]** — i.e. **uniform averaging** over the four heads. The full-data run (89.1% test) used this behavior. The architecture still benefits from multi-head diversity even under uniform fusion.
+```
+L = mean_i CE(head_i, y) + sparsity
+```
+
+Ensemble weights receive **no gradient** and stay at **w = [0.25, …]**. This is the recipe used for the **89.1%** full-data run.
+
+### v3 loss (default)
+
+```
+L = NLL(fused, y) + 0.5 · mean_i CE(head_i, y) + 0.1 · KL(head_i ← fused) + sparsity
+```
+
+Plus optional `min_ensemble_weight = 0.05` so no head is fully suppressed. On 5% data, v3 reaches **86.1%** test (vs v2 **85.0%**).
 
 ---
 
@@ -244,8 +256,14 @@ L = mean_i CE(head_i, y) + 0.05 · (mean(patch_probs) − 0.625)²
 | **Test accuracy** | **89.08%** |
 | Best val accuracy | 89.37% (epoch 57) |
 | Mask coverage | 0.625 (stable) |
-| Ensemble weights | [0.25, 0.25, 0.25, 0.25] |
-| Wall time | ~2.1 h (GPU) |
+| Ensemble weights | [0.25, 0.25, 0.25, 0.25] (v2 loss; weights not trained) |
+
+### Lite v3 (fused-CE + min_w=0.05, recommended)
+
+| Metric | 5% pilot |
+|--------|----------|
+| Test | **86.1%** (vs v2 85.0%) |
+| Ensemble weights | learnable, min ≥ 0.05 |
 
 **Baseline:** official Keras DeepYeastNet on full data ≈ **88.4%** test.
 

@@ -21,19 +21,22 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | Method | Val | Test |
 |--------|-----|------|
 | Official Keras DeepYeast | 76.8% | 80.6% |
-| **MaSE-Net Lite v2** | 82.0% | 85.0% |
+| MaSE-Net Lite v2 | 82.0% | 85.0% |
+| **MaSE-Net Lite v3** (fused-CE) | — | **86.1%** |
 
-Mask coverage stays at **0.625** (top-k=40 / 64 patches). See [ARCHITECTURE.md](ARCHITECTURE.md) for the full pipeline.
+**Recommended training:** Lite **v3** (default in `train_mase_lite.py`). See [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md).
 
-## Recommended script (Lite v2)
+## Recommended script (Lite v3)
 
 ```bash
 python pytorch/train_mase_lite.py \
   --data-dir /path/to/deepyeast_full \
   --epochs 60 --patience 15 --top-k 40 \
   --mask-sparsity-weight 0.05 --label-smoothing 0.1 \
-  --seed 42 --checkpoint-name mase_lite_full_v2
+  --seed 42 --checkpoint-name mase_lite_full_v3
 ```
+
+Reproduce v2 (89.1%): add `--legacy-v2-loss --checkpoint-name mase_lite_full_v2`.
 
 Init weights (5% PLCNN + masked selector) ship under `artifacts/checkpoints_5pct/` and load automatically unless `--no-init`.
 

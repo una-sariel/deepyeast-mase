@@ -35,6 +35,7 @@ class MaSELiteConfig(MaskedModelConfig):
   head_dropout: float = 0.5
   learnable_ensemble: bool = True
   ensemble_temperature: float = 1.0
+  min_ensemble_weight: float = 0.0
 
 
 MASE_LITE_DEFAULT = MaSELiteConfig(
@@ -45,6 +46,7 @@ MASE_LITE_DEFAULT = MaSELiteConfig(
   head_dropout=0.5,
   learnable_ensemble=True,
   ensemble_temperature=1.0,
+  min_ensemble_weight=0.0,
 )
 
 
@@ -97,11 +99,21 @@ class MaSELiteNet(nn.Module):
     )
     return masked_x, mask, patch_probs
 
+  def mixture_weights(self) -> torch.Tensor:
+    """Softmax ensemble weights with optional floor (anti-collapse)."""
+    weights = F.softmax(self.ensemble_logits / self.ensemble_temperature, dim=0)
+    eps = float(self.config.min_ensemble_weight)
+    if eps > 0.0:
+      n = weights.numel()
+      eps = min(eps, (1.0 / n) - 1e-4)
+      weights = weights * (1.0 - n * eps) + eps
+    return weights
+
   def _ensemble_probs(self, branch_logits: list[torch.Tensor]) -> torch.Tensor:
     stacked = torch.stack(
       [F.softmax(logits, dim=-1) for logits in branch_logits], dim=1
     )  # (B, 4, C)
-    weights = F.softmax(self.ensemble_logits / self.ensemble_temperature, dim=0)
+    weights = self.mixture_weights()
     return (stacked * weights.view(1, 4, 1)).sum(dim=1)
 
   def forward(
@@ -122,7 +134,11 @@ class MaSELiteNet(nn.Module):
       torch.cat([v, r, d], dim=1),
     ]
     branch_logits = [head(feat) for head, feat in zip(self.heads, feats)]
-    probs = self._ensemble_probs(branch_logits)
+    weights = self.mixture_weights()
+    stacked = torch.stack(
+      [F.softmax(logits, dim=-1) for logits in branch_logits], dim=1
+    )
+    probs = (stacked * weights.view(1, 4, 1)).sum(dim=1)
     ensemble = torch.log(probs.clamp_min(1e-8))
 
     if return_details:
@@ -131,11 +147,46 @@ class MaSELiteNet(nn.Module):
         "patch_probs": patch_probs,
         "branch_logits": branch_logits,
         "branch_feats": (v, r, d),
-        "ensemble_weights": F.softmax(
-          self.ensemble_logits / self.ensemble_temperature, dim=0
-        ).detach(),
+        "ensemble_log_probs": ensemble,
+        "ensemble_weights_live": weights,
+        "ensemble_weights": weights.detach(),
       }
     return ensemble
+
+
+def _nll_with_label_smoothing(
+  log_probs: torch.Tensor,
+  labels: torch.Tensor,
+  label_smoothing: float = 0.0,
+) -> torch.Tensor:
+  """NLL on log-probabilities (already log-normalized), with optional LS."""
+  if label_smoothing <= 0.0:
+    return F.nll_loss(log_probs, labels)
+  n_class = log_probs.size(-1)
+  with torch.no_grad():
+    soft = torch.full_like(log_probs, label_smoothing / (n_class - 1))
+    soft.scatter_(1, labels.unsqueeze(1), 1.0 - label_smoothing)
+  return -(soft * log_probs).sum(dim=-1).mean()
+
+
+def mase_lite_legacy_loss(
+  details: dict,
+  labels: torch.Tensor,
+  mask_sparsity_weight: float = 0.0,
+  target_mask_fraction: float = 0.6,
+  label_smoothing: float = 0.0,
+) -> torch.Tensor:
+  """v2 loss: mean per-head CE only (ensemble weights stay at 0.25)."""
+  losses = [
+    F.cross_entropy(logits, labels, label_smoothing=label_smoothing)
+    for logits in details["branch_logits"]
+  ]
+  loss = torch.stack(losses).mean()
+  if mask_sparsity_weight > 0.0:
+    loss = loss + mask_sparsity_weight * mask_sparsity_loss(
+      details["patch_probs"], target_mask_fraction
+    )
+  return loss
 
 
 def mase_lite_loss(
@@ -144,12 +195,54 @@ def mase_lite_loss(
   mask_sparsity_weight: float = 0.0,
   target_mask_fraction: float = 0.6,
   label_smoothing: float = 0.0,
+  aux_head_weight: float = 0.5,
+  distill_weight: float = 0.1,
+  ensemble_entropy_weight: float = 0.0,
 ) -> torch.Tensor:
-  losses = [
-    F.cross_entropy(logits, labels, label_smoothing=label_smoothing)
-    for logits in details["branch_logits"]
-  ]
-  loss = torch.stack(losses).mean()
+  """Fused-prediction CE (+ aux / KL / entropy anti-collapse).
+
+  Primary term uses the mixture log-probs so ``ensemble_logits`` get gradients.
+  Aux head CE keeps individual heads competent; KL pulls heads toward the fused
+  teacher (detached). Entropy term pushes mixture weights away from one-hot.
+  """
+  ensemble_log_probs = details.get("ensemble_log_probs")
+  if ensemble_log_probs is None:
+    raise KeyError("details must include ensemble_log_probs from forward()")
+
+  loss = _nll_with_label_smoothing(
+    ensemble_log_probs, labels, label_smoothing=label_smoothing
+  )
+
+  branch_logits: list[torch.Tensor] = details["branch_logits"]
+  if aux_head_weight > 0.0:
+    head_losses = [
+      F.cross_entropy(logits, labels, label_smoothing=label_smoothing)
+      for logits in branch_logits
+    ]
+    loss = loss + aux_head_weight * torch.stack(head_losses).mean()
+
+  if distill_weight > 0.0:
+    teacher = ensemble_log_probs.detach().exp().clamp_min(1e-8)
+    kl = torch.stack(
+      [
+        F.kl_div(
+          F.log_softmax(logits, dim=-1),
+          teacher,
+          reduction="batchmean",
+        )
+        for logits in branch_logits
+      ]
+    ).mean()
+    loss = loss + distill_weight * kl
+
+  if ensemble_entropy_weight > 0.0:
+    weights = details.get("ensemble_weights_live")
+    if weights is None:
+      raise KeyError("details must include ensemble_weights_live for entropy reg")
+    # maximize H(w) ≡ minimize -H(w)
+    entropy = -(weights * weights.clamp_min(1e-8).log()).sum()
+    loss = loss - ensemble_entropy_weight * entropy
+
   if mask_sparsity_weight > 0.0:
     loss = loss + mask_sparsity_weight * mask_sparsity_loss(
       details["patch_probs"], target_mask_fraction
@@ -163,7 +256,22 @@ def load_partial_state(
   prefixes: tuple[str, ...] | None = None,
 ) -> list[str]:
   """Load matching keys from a checkpoint; optional key-prefix filter."""
-  state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+  checkpoint_path = Path(checkpoint_path)
+  if not checkpoint_path.exists():
+    return []
+  size = checkpoint_path.stat().st_size
+  if size < 100_000:
+    raise RuntimeError(
+      f"Checkpoint too small ({size} bytes): {checkpoint_path}\n"
+      "Likely a Git LFS pointer. Run:\n"
+      "  git lfs install\n"
+      "  git lfs pull\n"
+      "See COLLABORATOR_V2_RUN.md"
+    )
+  try:
+    state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+  except TypeError:
+    state = torch.load(checkpoint_path, map_location="cpu")
   if isinstance(state, dict) and "state_dict" in state:
     state = state["state_dict"]
   model_state = model.state_dict()

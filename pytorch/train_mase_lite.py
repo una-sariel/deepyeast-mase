@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train MaSE-Net Lite v2 (longer + stronger reg + init + learnable ensemble)."""
+"""Train MaSE-Net Lite (v3 fused-CE default; --legacy-v2-loss for 89.1% recipe)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import random
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -28,6 +28,7 @@ from mase_lite_net import (  # noqa: E402
   MaSELiteConfig,
   MaSELiteNet,
   config_to_dict,
+  mase_lite_legacy_loss,
   mase_lite_loss,
   load_partial_state,
 )
@@ -45,10 +46,14 @@ def run_epoch(
   model: MaSELiteNet,
   loader: DataLoader,
   device: torch.device,
+  loss_fn: Callable[..., torch.Tensor],
   optimizer: torch.optim.Optimizer | None = None,
   mask_sparsity_weight: float = 0.0,
   target_mask_fraction: float = 0.6,
   label_smoothing: float = 0.0,
+  aux_head_weight: float = 0.5,
+  distill_weight: float = 0.1,
+  ensemble_entropy_weight: float = 0.0,
 ) -> dict[str, Any]:
   train = optimizer is not None
   model.train(train)
@@ -61,24 +66,30 @@ def run_epoch(
     if train:
       optimizer.zero_grad(set_to_none=True)
       ensemble, details = model(images, train=True, return_details=True)
-      loss = mase_lite_loss(
+      loss = loss_fn(
         details,
         labels,
         mask_sparsity_weight=mask_sparsity_weight,
         target_mask_fraction=target_mask_fraction,
         label_smoothing=label_smoothing,
+        aux_head_weight=aux_head_weight,
+        distill_weight=distill_weight,
+        ensemble_entropy_weight=ensemble_entropy_weight,
       )
       loss.backward()
       optimizer.step()
     else:
       with torch.inference_mode():
         ensemble, details = model(images, train=False, return_details=True)
-        loss = mase_lite_loss(
+        loss = loss_fn(
           details,
           labels,
           mask_sparsity_weight=mask_sparsity_weight,
           target_mask_fraction=target_mask_fraction,
           label_smoothing=label_smoothing,
+          aux_head_weight=aux_head_weight,
+          distill_weight=distill_weight,
+          ensemble_entropy_weight=ensemble_entropy_weight,
         )
 
     acc = (ensemble.argmax(dim=-1) == labels).float().mean().item()
@@ -111,7 +122,7 @@ def resolve_default_init(name: str) -> Path | None:
 
 def main() -> None:
   parser = argparse.ArgumentParser(
-    description="Train MaSE-Net Lite v2 (optimized recipe)"
+    description="Train MaSE-Net Lite (v3 fused-CE default)"
   )
   parser.add_argument("--data-dir", type=Path, default=Path("../deepyeast_full"))
   parser.add_argument("--epochs", type=int, default=60)
@@ -128,6 +139,41 @@ def main() -> None:
   parser.add_argument("--mask-sparsity-weight", type=float, default=0.05)
   parser.add_argument("--label-smoothing", type=float, default=0.1)
   parser.add_argument("--ensemble-temperature", type=float, default=1.0)
+  parser.add_argument(
+    "--aux-head-weight",
+    type=float,
+    default=0.5,
+    help="Weight for mean per-head CE (v3 only; 0 = fused CE only)",
+  )
+  parser.add_argument(
+    "--distill-weight",
+    type=float,
+    default=0.1,
+    help="KL weight: heads ← fused teacher (v3 only; 0 = off)",
+  )
+  parser.add_argument(
+    "--min-ensemble-weight",
+    type=float,
+    default=0.05,
+    help="Floor each mixture weight before renormalize (v3 anti-collapse)",
+  )
+  parser.add_argument(
+    "--ensemble-entropy-weight",
+    type=float,
+    default=0.0,
+    help="Encourage high-entropy mixture weights (optional)",
+  )
+  parser.add_argument(
+    "--ensemble-lr",
+    type=float,
+    default=None,
+    help="LR for ensemble_logits (default: 5x backbone-lr)",
+  )
+  parser.add_argument(
+    "--legacy-v2-loss",
+    action="store_true",
+    help="Use v2 head-mean CE loss (reproduces 89.1%% full-data run)",
+  )
   parser.add_argument("--num-workers", type=int, default=0)
   parser.add_argument("--no-augment", action="store_true")
   parser.add_argument("--no-strong-augment", action="store_true")
@@ -148,9 +194,14 @@ def main() -> None:
   parser.add_argument(
     "--checkpoint-name",
     type=str,
-    default="mase_lite_full_v2",
+    default="mase_lite_full_v3",
   )
   args = parser.parse_args()
+
+  if args.legacy_v2_loss:
+    args.min_ensemble_weight = 0.0
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v2"
 
   set_seed(args.seed)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -166,6 +217,7 @@ def main() -> None:
       "head_dropout": args.head_dropout,
       "learnable_ensemble": not args.no_learnable_ensemble,
       "ensemble_temperature": args.ensemble_temperature,
+      "min_ensemble_weight": args.min_ensemble_weight,
     }
   )
   model = MaSELiteNet(config).to(device)
@@ -176,46 +228,57 @@ def main() -> None:
     selector_path = args.init_selector or resolve_default_init(
       "masked_v3k60_pytorch"
     )
-    if plcnn_path is not None:
-      loaded = load_partial_state(
-        model,
-        plcnn_path,
-        prefixes=("branch_vgg.", "branch_resnet.", "branch_densenet."),
-      )
-      init_info["plcnn"] = {"path": str(plcnn_path), "n_tensors": len(loaded)}
-      print(f"Init PLCNN branches: {len(loaded)} tensors from {plcnn_path}", flush=True)
-    else:
-      print("Init PLCNN: skipped (checkpoint not found)", flush=True)
-    if selector_path is not None:
-      loaded = load_partial_state(model, selector_path, prefixes=("selector.",))
-      init_info["selector"] = {
-        "path": str(selector_path),
-        "n_tensors": len(loaded),
-      }
-      print(
-        f"Init selector: {len(loaded)} tensors from {selector_path}", flush=True
-      )
-    else:
-      print("Init selector: skipped (checkpoint not found)", flush=True)
+    try:
+      if plcnn_path is not None:
+        loaded = load_partial_state(
+          model,
+          plcnn_path,
+          prefixes=("branch_vgg.", "branch_resnet.", "branch_densenet."),
+        )
+        init_info["plcnn"] = {"path": str(plcnn_path), "n_tensors": len(loaded)}
+        print(
+          f"Init PLCNN branches: {len(loaded)} tensors from {plcnn_path}",
+          flush=True,
+        )
+      else:
+        print("Init PLCNN: skipped (checkpoint not found)", flush=True)
+      if selector_path is not None:
+        loaded = load_partial_state(model, selector_path, prefixes=("selector.",))
+        init_info["selector"] = {
+          "path": str(selector_path),
+          "n_tensors": len(loaded),
+        }
+        print(
+          f"Init selector: {len(loaded)} tensors from {selector_path}",
+          flush=True,
+        )
+      else:
+        print("Init selector: skipped (checkpoint not found)", flush=True)
+    except RuntimeError as exc:
+      print(f"ERROR: {exc}", flush=True)
+      raise SystemExit(1) from exc
 
-  optimizer = torch.optim.Adam(
-    [
-      {"params": model.selector.parameters(), "lr": args.selector_lr},
-      {
-        "params": list(model.branch_vgg.parameters())
-        + list(model.branch_resnet.parameters())
-        + list(model.branch_densenet.parameters())
-        + list(model.heads.parameters())
-        + (
-          [model.ensemble_logits]
-          if isinstance(model.ensemble_logits, nn.Parameter)
-          else []
-        ),
-        "lr": args.backbone_lr,
-      },
-    ],
-    weight_decay=args.weight_decay,
+  ens_params = (
+    [model.ensemble_logits]
+    if isinstance(model.ensemble_logits, nn.Parameter)
+    else []
   )
+  ensemble_lr = (
+    args.ensemble_lr if args.ensemble_lr is not None else args.backbone_lr * 5.0
+  )
+  param_groups: list[dict[str, Any]] = [
+    {"params": model.selector.parameters(), "lr": args.selector_lr},
+    {
+      "params": list(model.branch_vgg.parameters())
+      + list(model.branch_resnet.parameters())
+      + list(model.branch_densenet.parameters())
+      + list(model.heads.parameters()),
+      "lr": args.backbone_lr,
+    },
+  ]
+  if ens_params and not args.legacy_v2_loss:
+    param_groups.append({"params": ens_params, "lr": ensemble_lr})
+  optimizer = torch.optim.Adam(param_groups, weight_decay=args.weight_decay)
   scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, mode="max", factor=0.5, patience=5, min_lr=1e-6
   )
@@ -228,15 +291,72 @@ def main() -> None:
     num_workers=args.num_workers,
   )
 
+  if args.legacy_v2_loss:
+
+    def loss_fn(
+      details: dict,
+      labels: torch.Tensor,
+      mask_sparsity_weight: float = 0.0,
+      target_mask_fraction: float = 0.6,
+      label_smoothing: float = 0.0,
+      **kwargs: Any,
+    ) -> torch.Tensor:
+      return mase_lite_legacy_loss(
+        details,
+        labels,
+        mask_sparsity_weight=mask_sparsity_weight,
+        target_mask_fraction=target_mask_fraction,
+        label_smoothing=label_smoothing,
+      )
+
+    method = "mase_lite_v2"
+    loss_desc = "mean_head_ce + sparsity"
+    recipe = "v2"
+    tqdm_desc = "MaSELiteV2"
+  else:
+
+    def loss_fn(
+      details: dict,
+      labels: torch.Tensor,
+      mask_sparsity_weight: float = 0.0,
+      target_mask_fraction: float = 0.6,
+      label_smoothing: float = 0.0,
+      aux_head_weight: float = 0.5,
+      distill_weight: float = 0.1,
+      ensemble_entropy_weight: float = 0.0,
+    ) -> torch.Tensor:
+      return mase_lite_loss(
+        details,
+        labels,
+        mask_sparsity_weight=mask_sparsity_weight,
+        target_mask_fraction=target_mask_fraction,
+        label_smoothing=label_smoothing,
+        aux_head_weight=aux_head_weight,
+        distill_weight=distill_weight,
+        ensemble_entropy_weight=ensemble_entropy_weight,
+      )
+
+    method = "mase_lite_v3"
+    loss_desc = "fused_nll + aux_head_ce + kl_distill"
+    recipe = "v3"
+    tqdm_desc = "MaSELiteV3"
+
   expected_cov = args.top_k / 64.0
   n_params = sum(p.numel() for p in model.parameters())
   print(
-    f"MaSE-Net Lite v2 | device={device} | params={n_params:,} | "
+    f"MaSE-Net Lite {recipe} | device={device} | params={n_params:,} | "
     f"top_k={args.top_k} (mask~{expected_cov:.3f}) | "
     f"epochs={args.epochs} patience={args.patience} | "
     f"ls={args.label_smoothing} sparse_w={args.mask_sparsity_weight}",
     flush=True,
   )
+  if not args.legacy_v2_loss:
+    print(
+      f"  fused-CE aux={args.aux_head_weight} distill={args.distill_weight} "
+      f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight} "
+      f"ens_lr={ensemble_lr:g}",
+      flush=True,
+    )
   print(
     f"  train={len(train_loader.dataset)} "
     f"val={len(val_loader.dataset)} "
@@ -251,24 +371,32 @@ def main() -> None:
   best_state: dict[str, torch.Tensor] | None = None
   t0 = time.time()
 
-  for epoch in tqdm(range(args.epochs), desc="MaSELiteV2", mininterval=5):
+  epoch_kw = dict(
+    mask_sparsity_weight=args.mask_sparsity_weight,
+    target_mask_fraction=expected_cov,
+    label_smoothing=args.label_smoothing,
+    aux_head_weight=args.aux_head_weight,
+    distill_weight=args.distill_weight,
+    ensemble_entropy_weight=args.ensemble_entropy_weight,
+  )
+
+  for epoch in tqdm(range(args.epochs), desc=tqdm_desc, mininterval=5):
     train_m = run_epoch(
       model,
       train_loader,
       device,
+      loss_fn,
       optimizer=optimizer,
-      mask_sparsity_weight=args.mask_sparsity_weight,
-      target_mask_fraction=expected_cov,
-      label_smoothing=args.label_smoothing,
+      **epoch_kw,
     )
     val_m = run_epoch(
       model,
       val_loader,
       device,
+      loss_fn,
       optimizer=None,
-      mask_sparsity_weight=args.mask_sparsity_weight,
-      target_mask_fraction=expected_cov,
       label_smoothing=0.0,
+      **epoch_kw,
     )
     scheduler.step(val_m["accuracy"])
 
@@ -316,18 +444,19 @@ def main() -> None:
     model,
     test_loader,
     device,
+    loss_fn,
     optimizer=None,
-    mask_sparsity_weight=args.mask_sparsity_weight,
-    target_mask_fraction=expected_cov,
     label_smoothing=0.0,
+    **epoch_kw,
   )
 
   elapsed = time.time() - t0
   results = {
-    "method": "mase_lite_v2",
+    "method": method,
     "framework": "pytorch",
     "config": config_to_dict(config),
     "optimizations": {
+      "recipe": recipe,
       "epochs": args.epochs,
       "patience": args.patience,
       "label_smoothing": args.label_smoothing,
@@ -335,6 +464,13 @@ def main() -> None:
       "top_k": args.top_k,
       "strong_augment": (not args.no_augment) and (not args.no_strong_augment),
       "learnable_ensemble": not args.no_learnable_ensemble,
+      "legacy_v2_loss": args.legacy_v2_loss,
+      "aux_head_weight": args.aux_head_weight,
+      "distill_weight": args.distill_weight,
+      "min_ensemble_weight": args.min_ensemble_weight,
+      "ensemble_entropy_weight": args.ensemble_entropy_weight,
+      "ensemble_lr": ensemble_lr if not args.legacy_v2_loss else None,
+      "loss": loss_desc,
       "branch_dropout": args.branch_dropout,
       "head_dropout": args.head_dropout,
       "init": init_info,
@@ -368,13 +504,15 @@ def main() -> None:
       indent=2,
     )
 
-  print("\n=== MaSE-Net Lite v2 done ===", flush=True)
+  print(f"\n=== MaSE-Net Lite {recipe} done ===", flush=True)
   print(f"Best val: {best_val:.4f} @ epoch {best_epoch}", flush=True)
   print(
     f"Test:     {test_m['accuracy']:.4f}  "
     f"(mask={test_m['mask_coverage']:.3f})",
     flush=True,
   )
+  if ew := test_m.get("ensemble_weights"):
+    print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
   print(f"Elapsed:  {elapsed / 60:.1f} min", flush=True)
   print(f"Saved:    {ckpt_dir}", flush=True)
 
