@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **Professor re-run (TypeError fix):** [PROFESSOR_RERUN.md](PROFESSOR_RERUN.md)
 
 ## Results
 
