@@ -63,6 +63,6 @@ python pytorch\train_mase_lite.py `
 
 Useful fields: `best_val_accuracy`, `test.accuracy`, `test.ensemble_weights`, `best_epoch`.
 
-If you see `TypeError: ... multiple values for keyword argument 'label_smoothing'`, follow **[PROFESSOR_RERUN.md](PROFESSOR_RERUN.md)** (`git pull` then re-run).
+If you see `TypeError: ... multiple values for keyword argument 'label_smoothing'`, follow **[FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)** (`git pull` then re-run).
 
 Full guide: [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)

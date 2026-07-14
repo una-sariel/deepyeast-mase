@@ -1,4 +1,4 @@
-# Professor machine — pull fix and re-run (Windows)
+# Pull fix and re-run (Windows)
 
 If you hit this error:
 

@@ -8,7 +8,7 @@
 **Python:** 3.11 or 3.12  
 
 **5% pilot (seed=42):** val **82.0%**, test **85.0%** (Keras baseline test 80.6%).  
-**Full data v2 (professor, seed=42):** test **89.1%** (Keras 88.4%).  
+**Full data v2 (seed=42):** test **89.1%** (Keras 88.4%).  
 **Recommended now:** **v3** fused-CE + `min_ensemble_weight=0.05` (see Step 3).
 
 ---

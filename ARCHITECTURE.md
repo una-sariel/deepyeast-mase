@@ -249,7 +249,7 @@ L = mean_i CE(head_i, y) + 0.05 · (mean(patch_probs) − 0.625)²
 | Official Keras DeepYeast | 76.8% | 80.6% |
 | **MaSE-Net Lite v2** | 82.0% | 85.0% |
 
-### Full DeepYeast (professor run, Lite v2 + 5% init)
+### Full DeepYeast (Lite v2 + 5% init)
 
 | Metric | Value |
 |--------|-------|
