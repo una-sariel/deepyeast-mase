@@ -395,8 +395,7 @@ def main() -> None:
       device,
       loss_fn,
       optimizer=None,
-      label_smoothing=0.0,
-      **epoch_kw,
+      **{**epoch_kw, "label_smoothing": 0.0},
     )
     scheduler.step(val_m["accuracy"])
 
@@ -446,8 +445,7 @@ def main() -> None:
     device,
     loss_fn,
     optimizer=None,
-    label_smoothing=0.0,
-    **epoch_kw,
+    **{**epoch_kw, "label_smoothing": 0.0},
   )
 
   elapsed = time.time() - t0
