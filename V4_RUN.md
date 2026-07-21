@@ -1,4 +1,4 @@
-# MaSE-Net Lite v4 — Full-data run (Windows / professor)
+# MaSE-Net Lite v4 — Full-data run (Windows)
 
 **Goal:** beat full-data **v2 test 89.1%** without deleting v2/v3.
 
@@ -11,6 +11,24 @@
 **Same architecture** as v2/v3 (`MaSELiteNet`). Only the training recipe changes.
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
+
+---
+
+## Files to send back (after Step 1 + Step 3)
+
+Please return **exactly these two JSON files**:
+
+```text
+1) <deepyeast_full>\checkpoints\mase_lite_full_v4\results.json
+2) <deepyeast_full>\checkpoints\mase_lite_full_v4\uq_mc_dropout\summary.json
+```
+
+| File | What we use it for |
+|------|--------------------|
+| `results.json` | New accuracy (val/test), ensemble weights, mask coverage |
+| `uq_mc_dropout\summary.json` | Confidence / UQ: **UAUC** + τ sweep (UAcc/USen/USpe/UPre) |
+
+Optional (only if asked): `uq_mc_dropout\per_image_val.csv`, `per_image_test.csv`.
 
 ---
 
@@ -86,19 +104,11 @@ Wall time: similar to v3 (~1–2 h on GPU).
 ```text
 <deepyeast_full>\checkpoints\mase_lite_full_v4\
   best.pt
-  results.json
+  results.json      ← send back (#1)
   meta.json
 ```
 
----
-
-## Step 2 — After training, please send back
-
-```text
-<deepyeast_full>\checkpoints\mase_lite_full_v4\results.json
-```
-
-Useful fields:
+Useful fields in `results.json`:
 
 - `method` → should be `mase_lite_v4`
 - `best_val_accuracy`, `best_epoch`
@@ -108,7 +118,7 @@ Useful fields:
 
 ---
 
-## Step 3 — UQ on the same v4 checkpoint (MC Dropout)
+## Step 2 — UQ on the same v4 checkpoint (MC Dropout)
 
 **Do not retrain.** Architecture already has Dropout; this only changes test-time
 inference. See [UQ_MC_DROPOUT.md](UQ_MC_DROPOUT.md).
@@ -124,23 +134,24 @@ python pytorch\eval_mase_uq.py `
 
 Replace paths with your real `deepyeast_full` folder (same as Step 1).
 
-### What you get
+### Output folder
 
 ```text
 ...\checkpoints\mase_lite_full_v4\uq_mc_dropout\
-  summary.json          ← UAUC + τ sweep (UAcc/USen/USpe/UPre)
+  summary.json          ← send back (#2)  (UAUC + τ sweep)
   per_image_val.csv
   per_image_test.csv
 ```
 
-### Also send back
-
-```text
-...\mase_lite_full_v4\uq_mc_dropout\summary.json
-```
-
 Report **UAUC** first (no τ). Then pick τ on **val** (do **not** copy paper τ=0.3;
 PE max is ln(12)≈2.48). U matrix: PE &lt; τ → certain; PE ≥ τ → uncertain.
+
+---
+
+## Checklist before sending
+
+- [ ] `results.json` (accuracy)
+- [ ] `uq_mc_dropout\summary.json` (confidence / UQ)
 
 ---
 

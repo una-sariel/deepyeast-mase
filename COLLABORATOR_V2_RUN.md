@@ -2,7 +2,7 @@
 
 Use this for quick commands and LFS / init failures.
 
-**Detailed v4 steps (recommended):** [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md)
+**Detailed v4 steps (recommended):** [V4_RUN.md](V4_RUN.md)
 
 ---
 

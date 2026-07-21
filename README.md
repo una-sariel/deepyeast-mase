@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4 professor steps:** [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4 steps:** [V4_RUN.md](V4_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
@@ -25,7 +25,7 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | MaSE-Net Lite v2 | 82.0% | 85.0% |
 | MaSE-Net Lite v3 (learnable) | — | 86.1% |
 
-**Recommended training:** Lite **v4** (`--freeze-ensemble`). See [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md).
+**Recommended training:** Lite **v4** (`--freeze-ensemble`). See [V4_RUN.md](V4_RUN.md).
 
 ## Recommended script (Lite v4)
 
@@ -53,7 +53,7 @@ pytorch/
   train_mase.py
   eval_mase_uq.py         # MC Dropout UQ (optional)
 artifacts/checkpoints_5pct/
-PROFESSOR_V4_RUN.md
+V4_RUN.md
 FULL_DATA_QUICKSTART.md
 ARCHITECTURE.md
 UQ_MC_DROPOUT.md

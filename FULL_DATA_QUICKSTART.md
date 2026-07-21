@@ -10,7 +10,7 @@
 **5% pilot (seed=42):** val **82.0%**, test **85.0%** (Keras baseline test 80.6%).  
 **Full data v2 (seed=42):** test **89.1%** (Keras 88.4%).  
 **Full data v3 (learnable):** test **87.75%** (weight collapse).  
-**Recommended now:** **v4** fused-CE + **frozen uniform** weights (see Step 3 / [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md)).
+**Recommended now:** **v4** fused-CE + **frozen uniform** weights (see Step 3 / [V4_RUN.md](V4_RUN.md)).
 
 ---
 
@@ -95,7 +95,7 @@ Expect a `results.json` under `deepyeast_5pct\checkpoints\smoke_test\`.
 ## Step 3 — Full-data training (recommended = Lite **v4**)
 
 **v4** = fused-CE (like v3) + **frozen uniform** ensemble weights (like v2 diversity).  
-Candidate to beat full-data v2 (**89.1%**). Detailed steps: [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md).
+Candidate to beat full-data v2 (**89.1%**). Detailed steps: [V4_RUN.md](V4_RUN.md).
 
 ```powershell
 cd C:\dy\deepyeast-mase
@@ -144,11 +144,17 @@ Log checks: progress **`MaSELiteV4`**, every epoch **`w=[0.25,0.25,0.25,0.25]`**
 
 ### Outputs to send back
 
+Please return **these two JSON files** (see [V4_RUN.md](V4_RUN.md) for full steps including UQ):
+
 ```text
-...\checkpoints\mase_lite_full_v4\
-  results.json     ← best_val_accuracy + test.accuracy + ensemble_weights
-  best.pt
+1) ...\checkpoints\mase_lite_full_v4\results.json
+2) ...\checkpoints\mase_lite_full_v4\uq_mc_dropout\summary.json
 ```
+
+| File | Purpose |
+|------|---------|
+| `results.json` | Accuracy, ensemble weights, mask coverage |
+| `uq_mc_dropout\summary.json` | UAUC + τ sweep (after Step 3 UQ in V4_RUN.md) |
 
 Key fields in `results.json`:
 
