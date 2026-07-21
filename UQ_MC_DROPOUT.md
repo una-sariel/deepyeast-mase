@@ -27,15 +27,21 @@ python pytorch/eval_mase_uq.py \
 
 Config is auto-loaded from `results.json` next to the checkpoint when present.
 
-## Full-data (professor) example
+## Full-data (professor) — after Lite **v4** training
+
+Train first with [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md) (`--freeze-ensemble` →
+`mase_lite_full_v4`). Then evaluate UQ on that checkpoint (no retrain):
 
 ```powershell
 python pytorch\eval_mase_uq.py `
   --data-dir "D:\...\deepyeast_full" `
-  --checkpoint "D:\...\checkpoints\mase_lite_full_v3\best.pt" `
+  --checkpoint "D:\...\deepyeast_full\checkpoints\mase_lite_full_v4\best.pt" `
   --mc-samples 30 `
   --split both `
-  --out-dir "D:\...\checkpoints\mase_lite_full_v3\uq_mc_dropout"
+  --out-dir "D:\...\deepyeast_full\checkpoints\mase_lite_full_v4\uq_mc_dropout"
 ```
+
+Send back: `...\mase_lite_full_v4\uq_mc_dropout\summary.json`  
+(UAUC + τ sweep → UAcc/USen/USpe/UPre).
 
 Use `T=30` for reporting; smoke tests can use `T=10`.

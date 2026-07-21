@@ -108,6 +108,42 @@ Useful fields:
 
 ---
 
+## Step 3 — UQ on the same v4 checkpoint (MC Dropout)
+
+**Do not retrain.** Architecture already has Dropout; this only changes test-time
+inference. See [UQ_MC_DROPOUT.md](UQ_MC_DROPOUT.md).
+
+```powershell
+python pytorch\eval_mase_uq.py `
+  --data-dir "D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full" `
+  --checkpoint "D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full\checkpoints\mase_lite_full_v4\best.pt" `
+  --mc-samples 30 `
+  --split both `
+  --out-dir "D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full\checkpoints\mase_lite_full_v4\uq_mc_dropout"
+```
+
+Replace paths with your real `deepyeast_full` folder (same as Step 1).
+
+### What you get
+
+```text
+...\checkpoints\mase_lite_full_v4\uq_mc_dropout\
+  summary.json          ← UAUC + τ sweep (UAcc/USen/USpe/UPre)
+  per_image_val.csv
+  per_image_test.csv
+```
+
+### Also send back
+
+```text
+...\mase_lite_full_v4\uq_mc_dropout\summary.json
+```
+
+Report **UAUC** first (no τ). Then pick τ on **val** (do **not** copy paper τ=0.3;
+PE max is ln(12)≈2.48). U matrix: PE &lt; τ → certain; PE ≥ τ → uncertain.
+
+---
+
 ## Optional — still available (not deleted)
 
 ### A) Reproduce v2 (89.1% reference)
