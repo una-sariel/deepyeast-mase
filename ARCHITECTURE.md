@@ -185,13 +185,19 @@ L = mean_i CE(head_i, y) + sparsity
 
 Ensemble weights receive **no gradient** and stay at **w = [0.25, …]**. This is the recipe used for the **89.1%** full-data run.
 
-### v3 loss (default)
+### v3 loss (learnable mixture; default without `--freeze-ensemble`)
 
 ```
 L = NLL(fused, y) + 0.5 · mean_i CE(head_i, y) + 0.1 · KL(head_i ← fused) + sparsity
 ```
 
-Plus optional `min_ensemble_weight = 0.05` so no head is fully suppressed. On 5% data, v3 reaches **86.1%** test (vs v2 **85.0%**).
+Optional `min_ensemble_weight = 0.05`. On 5% data, **86.1%** test; on **full** data, learnable weights **collapsed** (~0.78 on one head) → **87.75%** test.
+
+### v4 loss (`--freeze-ensemble`) — recommended for full-data accuracy
+
+Same fused loss as v3, but **`ensemble_logits` are not trained** → **w = [0.25, …]** always.
+
+Goal: keep v2’s multi-head diversity while using v3’s fused supervision. Candidate to beat full-data **89.1%**.
 
 ---
 
@@ -299,9 +305,12 @@ Related variants in this repo:
 
 | Script | Model | Notes |
 |--------|-------|-------|
-| `train_mase_lite.py` | Lite v2 | **Recommended** — 89.1% full data |
-| `train_mase_lite_v1.py` | Lite v1 | Earlier baseline, uniform ensemble, weaker aug |
-| `train_mase.py` | Full MaSE | Adds true MSMM ResNet-34 backbone; GPU-heavy |
+| `train_mase_lite.py --freeze-ensemble` | Lite **v4** | **Recommended** — fused-CE + frozen uniform |
+| `train_mase_lite.py --legacy-v2-loss` | Lite v2 | 89.1% full data (reference) |
+| `train_mase_lite.py` (default) | Lite v3 | learnable mixture; collapsed on full data |
+| `train_mase_lite_v1.py` | Lite v1 | Earlier baseline |
+| `train_mase.py` | Full MaSE | MSMM ResNet-34 backbone; GPU-heavy |
+| `eval_mase_uq.py` | UQ eval | MC Dropout PE / UAUC (optional) |
 
 ---
 

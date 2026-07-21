@@ -9,7 +9,8 @@
 
 **5% pilot (seed=42):** val **82.0%**, test **85.0%** (Keras baseline test 80.6%).  
 **Full data v2 (seed=42):** test **89.1%** (Keras 88.4%).  
-**Recommended now:** **v3** fused-CE + `min_ensemble_weight=0.05` (see Step 3).
+**Full data v3 (learnable):** test **87.75%** (weight collapse).  
+**Recommended now:** **v4** fused-CE + **frozen uniform** weights (see Step 3 / [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md)).
 
 ---
 
@@ -91,9 +92,10 @@ Expect a `results.json` under `deepyeast_5pct\checkpoints\smoke_test\`.
 
 ---
 
-## Step 3 — Full-data training (recommended = Lite v3)
+## Step 3 — Full-data training (recommended = Lite **v4**)
 
-**v3** fixes ensemble learning (fused CE + weight floor). Same architecture as v2 (89.1% test).
+**v4** = fused-CE (like v3) + **frozen uniform** ensemble weights (like v2 diversity).  
+Candidate to beat full-data v2 (**89.1%**). Detailed steps: [PROFESSOR_V4_RUN.md](PROFESSOR_V4_RUN.md).
 
 ```powershell
 cd C:\dy\deepyeast-mase
@@ -103,6 +105,7 @@ git lfs pull
 
 python pytorch\train_mase_lite.py `
   --data-dir "D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full" `
+  --freeze-ensemble `
   --epochs 60 `
   --patience 15 `
   --batch-size 64 `
@@ -112,49 +115,48 @@ python pytorch\train_mase_lite.py `
   --label-smoothing 0.1 `
   --aux-head-weight 0.5 `
   --distill-weight 0.1 `
-  --min-ensemble-weight 0.05 `
   --seed 42 `
-  --checkpoint-name mase_lite_full_v3
+  --checkpoint-name mase_lite_full_v4
 ```
 
 Replace `--data-dir` with your actual `deepyeast_full` folder.
 
-Defaults already match v3 — you can omit the `--aux-head-weight` / `--distill-weight` / `--min-ensemble-weight` flags if you use a fresh `git pull`.
+Log checks: progress **`MaSELiteV4`**, every epoch **`w=[0.25,0.25,0.25,0.25]`**.
 
-### What v3 adds over v2
+### Recipe comparison
 
-| Item | v2 (89.1% run) | v3 (recommended) |
-|------|----------------|------------------|
-| Loss | mean per-head CE | **fused CE** + aux + KL |
-| Ensemble weights | stuck at 0.25 | **learnable** (watch `w=[...]` in log) |
-| Weight floor | none | **min_w = 0.05** (anti-collapse) |
-| 5% pilot | 85.0% | **86.1%** |
+| Item | v2 | v3 | **v4 (recommended)** |
+|------|----|----|----------------------|
+| Loss | mean per-head CE | fused CE + aux + KL | **fused CE + aux + KL** |
+| Ensemble weights | fixed 0.25 | learnable (collapsed on full) | **frozen 0.25** |
+| Full test | **89.1%** | 87.75% | **TBD (goal > 89.1%)** |
 
 ### What this does
 
 | Item | Setting |
 |------|---------|
-| Architecture | MaSE-Net Lite (~7M params) |
+| Architecture | MaSE-Net Lite (~7M params) — **same as v2/v3** |
 | Mask | hard top-k=40 → coverage **0.625** |
 | Init | `artifacts/checkpoints_5pct/plcnn_triple` + `masked_v3k60_pytorch` (auto) |
 | Regularization | strong augment, label smoothing 0.1, sparsity 0.05, dropout |
 | Early stop | patience 15 on val accuracy |
-| Output | `deepyeast_full\checkpoints\mase_lite_full_v3\` |
+| Output | `deepyeast_full\checkpoints\mase_lite_full_v4\` |
 
 ### Outputs to send back
 
 ```text
-...\checkpoints\mase_lite_full_v3\
+...\checkpoints\mase_lite_full_v4\
   results.json     ← best_val_accuracy + test.accuracy + ensemble_weights
   best.pt
 ```
 
 Key fields in `results.json`:
 
+- `method` → `mase_lite_v4`
 - `best_val_accuracy`
-- `test.accuracy`
+- `test.accuracy` (success if **> 0.891**)
 - `test.mask_coverage` (should stay ~0.625)
-- `test.ensemble_weights` (v3 should **not** stay at 0.25)
+- `test.ensemble_weights` (v4 should stay **~0.25**)
 - `best_epoch`
 
 ---
@@ -172,18 +174,30 @@ python pytorch\train_mase_lite.py `
   --seed 42 --checkpoint-name mase_lite_full_v2
 ```
 
-### B) No init (train from scratch)
+### B) Lite v3 learnable (known full-data collapse; keep for reference)
 
 ```powershell
 python pytorch\train_mase_lite.py `
   --data-dir "YOUR\deepyeast_full" `
+  --epochs 60 --patience 15 --top-k 40 `
+  --mask-sparsity-weight 0.05 --label-smoothing 0.1 `
+  --min-ensemble-weight 0.05 `
+  --seed 42 --checkpoint-name mase_lite_full_v3
+```
+
+### C) No init (train from scratch)
+
+```powershell
+python pytorch\train_mase_lite.py `
+  --data-dir "YOUR\deepyeast_full" `
+  --freeze-ensemble `
   --no-init `
   --epochs 60 --patience 15 --top-k 40 `
   --mask-sparsity-weight 0.05 --label-smoothing 0.1 `
-  --seed 42 --checkpoint-name mase_lite_full_v2_noinit
+  --seed 42 --checkpoint-name mase_lite_full_v4_noinit
 ```
 
-### C) Full MSMM backbone (needs GPU; slower / heavier)
+### D) Full MSMM backbone (needs GPU; slower / heavier)
 
 ```powershell
 python pytorch\train_mase.py `
@@ -192,7 +206,7 @@ python pytorch\train_mase.py `
   --seed 42 --checkpoint-name mase_full
 ```
 
-### D) Lite v1 baseline (no PLCNN/selector init)
+### E) Lite v1 baseline (no PLCNN/selector init)
 
 ```powershell
 python pytorch\train_mase_lite_v1.py `
@@ -205,12 +219,12 @@ python pytorch\train_mase_lite_v1.py `
 
 ## Comparison context (for reporting)
 
-| Setting | Official Keras | MaSE Lite v2 | MaSE Lite v3 |
-|---------|----------------|--------------|--------------|
-| 5% test | 80.6% | 85.0% | **86.1%** (pilot) |
-| Full test | 88.4% | **89.1%** | TBD |
+| Setting | Official Keras | Lite v2 | Lite v3 | Lite **v4** |
+|---------|----------------|---------|---------|-------------|
+| 5% test | 80.6% | 85.0% | 86.1% | TBD |
+| Full test | 88.4% | **89.1%** | 87.75% | **TBD (goal > 89.1%)** |
 
-Goal: v3 should match or beat v2 **89.1%**, with non-uniform `ensemble_weights`.
+Goal: **v4** test accuracy **> 89.1%**, with `ensemble_weights` staying at 0.25.
 
 ---
 

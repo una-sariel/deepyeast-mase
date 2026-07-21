@@ -174,6 +174,14 @@ def main() -> None:
     action="store_true",
     help="Use v2 head-mean CE loss (reproduces 89.1%% full-data run)",
   )
+  parser.add_argument(
+    "--freeze-ensemble",
+    action="store_true",
+    help=(
+      "MaSE Lite v4: fused-CE with mixture weights frozen at uniform 0.25 "
+      "(candidate to beat full-data v2; avoids learnable-weight collapse)"
+    ),
+  )
   parser.add_argument("--num-workers", type=int, default=0)
   parser.add_argument("--no-augment", action="store_true")
   parser.add_argument("--no-strong-augment", action="store_true")
@@ -197,6 +205,15 @@ def main() -> None:
     default="mase_lite_full_v3",
   )
   args = parser.parse_args()
+
+  if args.legacy_v2_loss and args.freeze_ensemble:
+    raise SystemExit("Use only one of --legacy-v2-loss or --freeze-ensemble")
+
+  if args.freeze_ensemble:
+    args.no_learnable_ensemble = True
+    args.min_ensemble_weight = 0.0
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v4"
 
   if args.legacy_v2_loss:
     args.min_ensemble_weight = 0.0
@@ -340,6 +357,17 @@ def main() -> None:
     loss_desc = "fused_nll + aux_head_ce + kl_distill"
     recipe = "v3"
     tqdm_desc = "MaSELiteV3"
+    if args.freeze_ensemble:
+      method = "mase_lite_v4"
+      recipe = "v4"
+      loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
+      tqdm_desc = "MaSELiteV4"
+    elif args.no_learnable_ensemble:
+      # Same math as v4; keep explicit --freeze-ensemble for reporting
+      method = "mase_lite_v4"
+      recipe = "v4"
+      loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
+      tqdm_desc = "MaSELiteV4"
 
   expected_cov = args.top_k / 64.0
   n_params = sum(p.numel() for p in model.parameters())
@@ -351,10 +379,16 @@ def main() -> None:
     flush=True,
   )
   if not args.legacy_v2_loss:
+    if args.freeze_ensemble or args.no_learnable_ensemble:
+      ens_mode = "v4 frozen_uniform w=0.25"
+    else:
+      ens_mode = (
+        f"v3 learnable ens_lr={ensemble_lr:g} "
+        f"min_w={args.min_ensemble_weight}"
+      )
     print(
       f"  fused-CE aux={args.aux_head_weight} distill={args.distill_weight} "
-      f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight} "
-      f"ens_lr={ensemble_lr:g}",
+      f"ent_w={args.ensemble_entropy_weight} | {ens_mode}",
       flush=True,
     )
   print(

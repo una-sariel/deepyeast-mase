@@ -154,6 +154,20 @@ class MaSELiteNet(nn.Module):
     return ensemble
 
 
+def enable_mc_dropout(model: nn.Module) -> None:
+  """Keep BatchNorm in eval; turn Dropout on for MC sampling at test time."""
+  model.eval()
+  for module in model.modules():
+    if isinstance(module, nn.Dropout):
+      module.train()
+
+
+def predictive_entropy(probs: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+  """PE = -Σ μ_c log μ_c over class dim. Accepts (C,) or (B, C)."""
+  probs = probs.clamp_min(eps)
+  return -(probs * probs.log()).sum(dim=-1)
+
+
 def _nll_with_label_smoothing(
   log_probs: torch.Tensor,
   labels: torch.Tensor,
