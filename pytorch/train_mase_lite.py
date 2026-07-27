@@ -42,6 +42,28 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def resolve_device(pref: str = "auto") -> torch.device:
+  """Prefer CUDA, then Apple MPS, then CPU. Use --device to force."""
+  pref = (pref or "auto").lower()
+  if pref == "cuda":
+    if not torch.cuda.is_available():
+      raise RuntimeError("--device cuda requested but CUDA is unavailable")
+    return torch.device("cuda")
+  if pref == "mps":
+    if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+      raise RuntimeError("--device mps requested but MPS is unavailable")
+    return torch.device("mps")
+  if pref == "cpu":
+    return torch.device("cpu")
+  if pref != "auto":
+    raise ValueError(f"Unknown --device {pref!r} (use auto|cuda|mps|cpu)")
+  if torch.cuda.is_available():
+    return torch.device("cuda")
+  if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    return torch.device("mps")
+  return torch.device("cpu")
+
+
 def run_epoch(
   model: MaSELiteNet,
   loader: DataLoader,
@@ -125,6 +147,13 @@ def main() -> None:
     description="Train MaSE-Net Lite (v3 fused-CE default)"
   )
   parser.add_argument("--data-dir", type=Path, default=Path("../deepyeast_full"))
+  parser.add_argument(
+    "--device",
+    type=str,
+    default="auto",
+    choices=["auto", "cuda", "mps", "cpu"],
+    help="auto = CUDA > MPS > CPU (Apple Silicon uses MPS when available)",
+  )
   parser.add_argument("--epochs", type=int, default=60)
   parser.add_argument("--batch-size", type=int, default=64)
   parser.add_argument("--selector-lr", type=float, default=3e-3)
@@ -268,7 +297,7 @@ def main() -> None:
       args.checkpoint_name = "mase_lite_full_v2"
 
   set_seed(args.seed)
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  device = resolve_device(args.device)
   data_dir = args.data_dir.resolve()
   ckpt_dir = data_dir / "checkpoints" / args.checkpoint_name
 

@@ -48,6 +48,27 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def resolve_device(pref: str = "auto") -> torch.device:
+  pref = (pref or "auto").lower()
+  if pref == "cuda":
+    if not torch.cuda.is_available():
+      raise RuntimeError("--device cuda requested but CUDA is unavailable")
+    return torch.device("cuda")
+  if pref == "mps":
+    if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+      raise RuntimeError("--device mps requested but MPS is unavailable")
+    return torch.device("mps")
+  if pref == "cpu":
+    return torch.device("cpu")
+  if pref != "auto":
+    raise ValueError(f"Unknown --device {pref!r} (use auto|cuda|mps|cpu)")
+  if torch.cuda.is_available():
+    return torch.device("cuda")
+  if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    return torch.device("mps")
+  return torch.device("cpu")
+
+
 def load_checkpoint(model: MaSELiteNet, path: Path) -> None:
   path = Path(path)
   if not path.exists():
@@ -267,6 +288,13 @@ def main() -> None:
   parser.add_argument("--data-dir", type=Path, required=True)
   parser.add_argument("--checkpoint", type=Path, required=True)
   parser.add_argument(
+    "--device",
+    type=str,
+    default="auto",
+    choices=["auto", "cuda", "mps", "cpu"],
+    help="auto = CUDA > MPS > CPU",
+  )
+  parser.add_argument(
     "--results-json",
     type=Path,
     default=None,
@@ -297,7 +325,7 @@ def main() -> None:
   args = parser.parse_args()
 
   set_seed(args.seed)
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  device = resolve_device(args.device)
   data_dir = args.data_dir.resolve()
   ckpt = args.checkpoint.resolve()
   results_json = args.results_json
