@@ -4,9 +4,10 @@
 
 | Version | Idea | Full-data test (known) |
 |---------|------|------------------------|
-| **v2** | head-mean CE, weights stuck at 0.25 | **89.1%** (baseline to beat) |
+| **v2** | head-mean CE, weights stuck at 0.25 | **89.1%** |
 | **v3** | fused-CE, **learnable** weights | **87.75%** (collapsed ~0.78 on one head) |
-| **v4** | fused-CE, **frozen uniform** w=0.25 | **TBD** ← run this |
+| **v4** | fused-CE, **frozen uniform** w=0.25 | **≈89.58%** (current best accuracy) |
+| **v5** | fused-CE, learnable + anti-collapse | see [V5_RUN.md](V5_RUN.md) |
 
 **Same architecture** as v2/v3 (`MaSELiteNet`). Only the training recipe changes.
 

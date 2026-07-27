@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data guide:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4 steps:** [V4_RUN.md](V4_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
@@ -13,9 +13,10 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | Method | Test | Notes |
 |--------|------|-------|
 | Keras baseline | 88.4% | official |
-| **MaSE Lite v2** | **89.1%** | uniform heads; head-mean CE |
-| MaSE Lite v3 | 87.75% | fused-CE, learnable weights **collapsed** |
-| **MaSE Lite v4** | TBD | fused-CE + **frozen** uniform — **recommended** |
+| MaSE Lite v2 | 89.1% | uniform; head-mean CE |
+| MaSE Lite v3 | 87.75% | learnable; **collapsed** |
+| **MaSE Lite v4** | **≈89.58%** | fused-CE + **frozen** uniform — current accuracy SOTA |
+| MaSE Lite v5 | TBD | learnable + anti-collapse + PE→AUROC |
 
 ### 5% pilot (seed=42)
 
@@ -24,10 +25,13 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | Official Keras DeepYeast | 76.8% | 80.6% |
 | MaSE-Net Lite v2 | 82.0% | 85.0% |
 | MaSE-Net Lite v3 (learnable) | — | 86.1% |
+| MaSE-Net Lite v4 (frozen) | 82.7% | **85.9%** |
 
-**Recommended training:** Lite **v4** (`--freeze-ensemble`). See [V4_RUN.md](V4_RUN.md).
+**Accuracy default:** Lite **v4**. **Next experiment:** Lite **v5** (`--v5`, includes PE→AUROC).
 
-## Recommended script (Lite v4)
+## Recommended scripts
+
+### v4 (accuracy SOTA)
 
 ```bash
 python pytorch/train_mase_lite.py \
@@ -38,8 +42,21 @@ python pytorch/train_mase_lite.py \
   --seed 42 --checkpoint-name mase_lite_full_v4
 ```
 
+### v5 (learnable anti-collapse + UQ)
+
+```bash
+python pytorch/train_mase_lite.py \
+  --data-dir /path/to/deepyeast_full \
+  --v5 \
+  --epochs 60 --patience 15 --top-k 40 \
+  --mask-sparsity-weight 0.05 --label-smoothing 0.1 \
+  --seed 42 --checkpoint-name mase_lite_full_v5
+```
+
+Reports `uq.test_AUROC_PE` (PE → AUROC). Softmax baseline is secondary only.
+
 - Reproduce **v2** (89.1%): `--legacy-v2-loss --checkpoint-name mase_lite_full_v2`
-- Reproduce **v3** (learnable): omit `--freeze-ensemble`, use `--checkpoint-name mase_lite_full_v3`
+- Reproduce **v3**: default flags without `--freeze-ensemble` / `--v5`
 
 Init weights (5% PLCNN + masked selector) ship under `artifacts/checkpoints_5pct/` and load automatically unless `--no-init`.
 

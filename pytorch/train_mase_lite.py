@@ -179,8 +179,32 @@ def main() -> None:
     action="store_true",
     help=(
       "MaSE Lite v4: fused-CE with mixture weights frozen at uniform 0.25 "
-      "(candidate to beat full-data v2; avoids learnable-weight collapse)"
+      "(full-data ~89.6%%; avoids learnable-weight collapse)"
     ),
+  )
+  parser.add_argument(
+    "--v5",
+    action="store_true",
+    help=(
+      "MaSE Lite v5: fused-CE + learnable mixture with anti-collapse "
+      "(min_w=0.15, ent_w=0.01, ens_lr=0.5x backbone). Goal: beat v4 accuracy."
+    ),
+  )
+  parser.add_argument(
+    "--with-uq",
+    action="store_true",
+    help="After test: MC Dropout PE → AUROC(PE)=UAUC; write uq into results + uq_mc_dropout/",
+  )
+  parser.add_argument(
+    "--no-uq",
+    action="store_true",
+    help="Disable UQ even for --v5 (v5 enables --with-uq by default)",
+  )
+  parser.add_argument(
+    "--uq-mc-samples",
+    type=int,
+    default=30,
+    help="MC Dropout forward samples for --with-uq (default 30)",
   )
   parser.add_argument("--num-workers", type=int, default=0)
   parser.add_argument("--no-augment", action="store_true")
@@ -206,8 +230,31 @@ def main() -> None:
   )
   args = parser.parse_args()
 
-  if args.legacy_v2_loss and args.freeze_ensemble:
-    raise SystemExit("Use only one of --legacy-v2-loss or --freeze-ensemble")
+  exclusive = [
+    name
+    for name, flag in [
+      ("--legacy-v2-loss", args.legacy_v2_loss),
+      ("--freeze-ensemble", args.freeze_ensemble),
+      ("--v5", args.v5),
+    ]
+    if flag
+  ]
+  if len(exclusive) > 1:
+    raise SystemExit(f"Use only one of: {', '.join(exclusive)}")
+
+  if args.v5:
+    # Anti-collapse learnable mixture
+    args.no_learnable_ensemble = False
+    if "--min-ensemble-weight" not in sys.argv:
+      args.min_ensemble_weight = 0.15
+    if "--ensemble-entropy-weight" not in sys.argv:
+      args.ensemble_entropy_weight = 0.01
+    if "--ensemble-lr" not in sys.argv:
+      args.ensemble_lr = args.backbone_lr * 0.5
+    if not args.no_uq:
+      args.with_uq = True
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v5"
 
   if args.freeze_ensemble:
     args.no_learnable_ensemble = True
@@ -357,7 +404,15 @@ def main() -> None:
     loss_desc = "fused_nll + aux_head_ce + kl_distill"
     recipe = "v3"
     tqdm_desc = "MaSELiteV3"
-    if args.freeze_ensemble:
+    if args.v5:
+      method = "mase_lite_v5"
+      recipe = "v5"
+      loss_desc = (
+        "fused_nll + aux + kl | learnable anti-collapse "
+        f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
+      )
+      tqdm_desc = "MaSELiteV5"
+    elif args.freeze_ensemble:
       method = "mase_lite_v4"
       recipe = "v4"
       loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
@@ -379,7 +434,12 @@ def main() -> None:
     flush=True,
   )
   if not args.legacy_v2_loss:
-    if args.freeze_ensemble or args.no_learnable_ensemble:
+    if args.v5:
+      ens_mode = (
+        f"v5 learnable anti-collapse ens_lr={ensemble_lr:g} "
+        f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
+      )
+    elif args.freeze_ensemble or args.no_learnable_ensemble:
       ens_mode = "v4 frozen_uniform w=0.25"
     else:
       ens_mode = (
@@ -483,6 +543,26 @@ def main() -> None:
   )
 
   elapsed = time.time() - t0
+
+  # Weight health (anti-collapse check for learnable recipes)
+  ew = test_m.get("ensemble_weights")
+  weight_health: dict[str, Any] | None = None
+  if ew is not None:
+    min_w = float(min(ew))
+    max_w = float(max(ew))
+    weight_health = {
+      "min_w": min_w,
+      "max_w": max_w,
+      "ok": bool(min_w >= 0.10 - 1e-6 and max_w <= 0.55 + 1e-6),
+      "rule": "ok if min_w>=0.10 and max_w<=0.55",
+    }
+    if args.v5 and not weight_health["ok"]:
+      print(
+        f"WARNING: v5 weight health FAIL min={min_w:.3f} max={max_w:.3f} "
+        f"(want min>=0.10 max<=0.55)",
+        flush=True,
+      )
+
   results = {
     "method": method,
     "framework": "pytorch",
@@ -497,6 +577,8 @@ def main() -> None:
       "strong_augment": (not args.no_augment) and (not args.no_strong_augment),
       "learnable_ensemble": not args.no_learnable_ensemble,
       "legacy_v2_loss": args.legacy_v2_loss,
+      "freeze_ensemble": args.freeze_ensemble,
+      "v5": args.v5,
       "aux_head_weight": args.aux_head_weight,
       "distill_weight": args.distill_weight,
       "min_ensemble_weight": args.min_ensemble_weight,
@@ -506,16 +588,80 @@ def main() -> None:
       "branch_dropout": args.branch_dropout,
       "head_dropout": args.head_dropout,
       "init": init_info,
+      "with_uq": bool(args.with_uq),
+      "uq_mc_samples": args.uq_mc_samples if args.with_uq else None,
     },
     "params": n_params,
     "best_epoch": best_epoch,
     "best_val_accuracy": best_val,
     "test": test_m,
+    "weight_health": weight_health,
     "elapsed_sec": elapsed,
     "history": history,
     "data_dir": str(data_dir),
     "seed": args.seed,
   }
+
+  # PE → AUROC (primary UQ metric = UAUC)
+  if args.with_uq:
+    from eval_mase_uq import (  # noqa: E402
+      mc_predict_loader,
+      summarize_split,
+      write_per_image_csv,
+    )
+    import math
+
+    print(
+      f"\n=== UQ: MC Dropout T={args.uq_mc_samples} (PE → AUROC) ===",
+      flush=True,
+    )
+    uq_dir = ckpt_dir / "uq_mc_dropout"
+    uq_dir.mkdir(parents=True, exist_ok=True)
+    pe_max = math.log(config.num_classes)
+    thresholds = [float(x) for x in np.linspace(0.0, pe_max, 21)]
+    uq_splits: dict[str, Any] = {}
+    for split_name, loader in (("val", val_loader), ("test", test_loader)):
+      arrays = mc_predict_loader(model, loader, device, args.uq_mc_samples)
+      write_per_image_csv(uq_dir / f"per_image_{split_name}.csv", arrays)
+      split_sum = summarize_split(arrays, thresholds, config.num_classes)
+      uq_splits[split_name] = {
+        "n": split_sum["n"],
+        "accuracy_mc": split_sum["accuracy"],
+        "AUROC_PE": split_sum["UAUC"],  # canonical name
+        "UAUC": split_sum["UAUC"],  # alias
+        "UAUC_via_1_minus_maxprob": split_sum["UAUC_via_1_minus_maxprob"],
+        "pe_mean": split_sum["pe_mean"],
+        "pe_std": split_sum["pe_std"],
+        "suggested_tau_max_U_F1": split_sum.get("suggested_tau_max_U_F1"),
+        "threshold_sweep": split_sum["threshold_sweep"],
+      }
+      print(
+        f"  {split_name}: AUROC(PE)={split_sum['UAUC']:.4f}  "
+        f"mc_acc={split_sum['accuracy']:.4f}  "
+        f"pe_mean={split_sum['pe_mean']:.4f}",
+        flush=True,
+      )
+    uq_payload = {
+      "note": (
+        "Primary metric is AUROC(PE)=UAUC: ROC AUC using predictive entropy "
+        "to rank incorrect predictions. "
+        "UAUC_via_1_minus_maxprob is Softmax baseline only — not primary."
+      ),
+      "mc_samples": args.uq_mc_samples,
+      "splits": uq_splits,
+    }
+    results["uq"] = {
+      "mc_samples": args.uq_mc_samples,
+      "test_AUROC_PE": uq_splits["test"]["AUROC_PE"],
+      "val_AUROC_PE": uq_splits["val"]["AUROC_PE"],
+      "test_UAUC": uq_splits["test"]["UAUC"],
+      "val_UAUC": uq_splits["val"]["UAUC"],
+      "note": uq_payload["note"],
+    }
+    with (uq_dir / "summary.json").open("w") as f:
+      json.dump(uq_payload, f, indent=2)
+    print(f"UQ saved: {uq_dir / 'summary.json'}", flush=True)
+
   ckpt_dir.mkdir(parents=True, exist_ok=True)
   with (ckpt_dir / "results.json").open("w") as f:
     json.dump(results, f, indent=2)
@@ -545,6 +691,18 @@ def main() -> None:
   )
   if ew := test_m.get("ensemble_weights"):
     print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
+  if weight_health is not None:
+    print(
+      f"Weight health: min={weight_health['min_w']:.3f} "
+      f"max={weight_health['max_w']:.3f} ok={weight_health['ok']}",
+      flush=True,
+    )
+  if args.with_uq and "uq" in results:
+    print(
+      f"AUROC(PE) test={results['uq']['test_AUROC_PE']:.4f}  "
+      f"val={results['uq']['val_AUROC_PE']:.4f}",
+      flush=True,
+    )
   print(f"Elapsed:  {elapsed / 60:.1f} min", flush=True)
   print(f"Saved:    {ckpt_dir}", flush=True)
 
