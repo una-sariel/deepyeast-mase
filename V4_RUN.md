@@ -71,6 +71,20 @@ Activate venv:
 
 ---
 
+## Step 0.5 — Full data folder (`deepyeast_full`)
+
+Bare `python prepare_deepyeast_subset.py` builds **5%** → `deepyeast_5pct` only.
+For full-data training:
+
+```powershell
+python prepare_deepyeast_subset.py --fraction 1.0 --out-dir deepyeast_full --seed 42
+```
+
+Or reuse an existing `deepyeast_full` from earlier runs and point `--data-dir` at it.
+Details: [V5_RUN.md](V5_RUN.md) Step 0.5 / [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md).
+
+---
+
 ## Step 1 — Recommended: train Lite **v4** (full data)
 
 Replace `--data-dir` with your real `deepyeast_full` path (same as v2/v3 runs).

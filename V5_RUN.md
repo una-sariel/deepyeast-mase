@@ -57,6 +57,49 @@ python -c "t=open('pytorch/train_mase_lite.py',encoding='utf-8').read(); print('
 
 ---
 
+## Step 0.5 — Prepare **full** data (`deepyeast_full`)
+
+Training expects a folder named **`deepyeast_full`** (≈65k+12.5k+12.5k images).
+
+**Do not** run bare `prepare_deepyeast_subset.py` — that defaults to **5%** and writes `deepyeast_5pct` only (what you just saw: 3250/626/623).
+
+### If you already have full data from a previous v2/v3/v4 run
+
+Point `--data-dir` at that existing folder (any path is fine). Skip this step.
+
+### If you need to build / refresh full data
+
+From the MaSE repo root (venv on):
+
+```powershell
+python prepare_deepyeast_subset.py `
+  --fraction 1.0 `
+  --out-dir deepyeast_full `
+  --seed 42
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--fraction 1.0` | **all** images (not 5%) |
+| `--out-dir deepyeast_full` | output folder name training expects |
+
+Expect roughly:
+
+```text
+train: 65000 -> 65000
+val:   12500 -> 12500
+test:  12500 -> 12500
+Done. Output: ...\deepyeast_full
+```
+
+Notes:
+
+- Manifests / `main.tar.gz` may show **cached** under `C:\Users\<you>\.deepyeast\cache\` — that is OK; extraction of the **full** set still takes time and disk.
+- To force re-download of a bad cache file, delete the file in that cache folder and re-run the same command.
+- Then set `--data-dir` to the absolute path of this `deepyeast_full` folder in Step 1.
+
+---
+
 ## Step 1 — Train Lite v5 (full data)
 
 ```powershell
