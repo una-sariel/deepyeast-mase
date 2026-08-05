@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
@@ -27,7 +27,22 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | MaSE-Net Lite v3 (learnable) | — | 86.1% |
 | MaSE-Net Lite v4 (frozen) | 82.7% | **85.9%** |
 
-**Accuracy default:** Lite **v4**. **Next experiment:** Lite **v5** (`--v5`, includes PE→AUROC).
+**Accuracy default:** Lite **v4**. **Learnable fusion:** **v6 TP-AHF** ([V6_RUN.md](V6_RUN.md)). **v5** (`--v5`) = single-phase learnable + PE→AUROC.
+
+## Download DeepYeast data
+
+**Important:** `prepare_deepyeast_subset.py` defaults to a **5% subset** (`deepyeast_5pct`, ~4,500 images).
+Running it with **no flags does NOT create `deepyeast_full`.**
+
+| Goal | Command |
+|------|---------|
+| **Full dataset** (~90,000 images) | `python prepare_deepyeast_subset.py --fraction 1.0 --out-dir deepyeast_full --seed 42` |
+| 5% smoke test only | `python prepare_deepyeast_subset.py --fraction 0.05 --out-dir deepyeast_5pct --seed 42` |
+
+After full download you should see **train 65,000 / val 12,500 / test 12,500** under `deepyeast_full/`.
+Training uses `--data-dir /path/to/deepyeast_full`.
+
+Details (cache location, re-download, verification): **[FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md)** → *Download full data*.
 
 ## Recommended scripts
 
@@ -71,6 +86,7 @@ pytorch/
   eval_mase_uq.py         # MC Dropout UQ (optional)
 artifacts/checkpoints_5pct/
 V4_RUN.md
+V6_RUN.md
 FULL_DATA_QUICKSTART.md
 ARCHITECTURE.md
 UQ_MC_DROPOUT.md

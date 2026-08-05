@@ -10,7 +10,80 @@
 **5% pilot (seed=42):** val **82.0%**, test **85.0%** (Keras baseline test 80.6%).  
 **Full data v2 (seed=42):** test **89.1%** (Keras 88.4%).  
 **Full data v3 (learnable):** test **87.75%** (weight collapse).  
-**Recommended now:** **v4** fused-CE + **frozen uniform** weights (see Step 3 / [V4_RUN.md](V4_RUN.md)).
+**Recommended now:** **v4** fused-CE + **frozen uniform** weights (see [V4_RUN.md](V4_RUN.md)).  
+**New — learnable fusion:** **v6 TP-AHF** two-phase ([V6_RUN.md](V6_RUN.md)).
+
+---
+
+## Download full data (`deepyeast_full`)
+
+Use this when you need **all** images for full-data MaSE training (v4 / v5 / etc.).
+
+### One command (from repo root)
+
+```powershell
+cd path\to\deepyeast-mase
+python prepare_deepyeast_subset.py --fraction 1.0 --out-dir deepyeast_full --seed 42
+```
+
+**Do not omit `--fraction 1.0`.** Without it, the script uses the default `--fraction 0.05` and writes **`deepyeast_5pct`** (~4,499 images), not `deepyeast_full`.
+
+### What the script does
+
+1. **Step 1** — Download manifest files (cached after first run).
+2. **Step 2** — Stratified sampling per split (with `--fraction 1.0`, keeps every image).
+3. **Step 3** — Download `main.tar.gz` (~398 MB) from DeepYeast server (cached after first run).
+4. **Step 4** — Extract selected PNGs into `deepyeast_full/train|val|test/<class>/`, write `labels.csv`, `class_map.json`, `dataset_stats.json`.
+
+**Download cache (reused):** `%USERPROFILE%\.deepyeast\cache\`  
+(manifests + `main.tar.gz`; safe to keep — re-runs skip re-download if checksums match).
+
+**Output folder:** `deepyeast_full/` next to the script (or whatever you pass to `--out-dir`).
+
+If `deepyeast_full` already exists, the script **deletes and recreates** it (full re-extract).
+
+### Expected result (full data, seed=42)
+
+```text
+deepyeast_full/
+  train/          65,000 images
+  val/            12,500 images
+  test/           12,500 images
+  labels.csv
+  class_map.json
+  dataset_stats.json
+```
+
+(`metadata.csv` is auto-created from `labels.csv` on first training load.)
+
+Verify counts:
+
+```powershell
+python -c "import json; s=json.load(open('deepyeast_full/dataset_stats.json')); print(s['total_images'], s['splits'])"
+```
+
+You should see **`total_images`: 90000**.
+
+### Re-download / start over
+
+Same command as above — it will reuse cached tar if present, wipe `deepyeast_full/`, and extract again:
+
+```powershell
+python prepare_deepyeast_subset.py --fraction 1.0 --out-dir deepyeast_full --seed 42
+```
+
+To force re-download the tar, delete `%USERPROFILE%\.deepyeast\cache\main.tar.gz` first.
+
+**Time:** First run ~10–30+ minutes depending on network and disk (download ~400 MB + extract ~90k PNGs). Later re-extracts are faster if tar is cached.
+
+### Common mistake
+
+| You ran | You got | Training expects |
+|---------|---------|------------------|
+| `python prepare_deepyeast_subset.py` (no args) | `deepyeast_5pct`, ~4499 images | — |
+| Full training `--data-dir deepyeast_full` | folder missing | **90000** images |
+
+**Fix:** Run the full command with `--fraction 1.0 --out-dir deepyeast_full`, then point `--data-dir` at that folder.
 
 ---
 
@@ -20,18 +93,14 @@ You already have full DeepYeast data, for example:
 
 ```text
 D:\UG Research\DeepYeast\Qiwu\...\deepyeast_full\
-  metadata.csv
-  images\...
+  train\ ...
+  val\ ...
+  test\ ...
+  labels.csv
 ```
 
 Set that path as `DATA_DIR` below.  
-If you do **not** have full data yet:
-
-```powershell
-python prepare_deepyeast_subset.py --fraction 1.0 --out-dir deepyeast_full --seed 42
-```
-
-(`--fraction 1.0` = all images; download can take a while.)
+If you do **not** have full data yet, see **[Download full data](#download-full-data-deepyeast_full)** above (not the 5% default).
 
 ---
 

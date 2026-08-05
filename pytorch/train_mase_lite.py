@@ -23,6 +23,7 @@ if str(_PYTORCH_DIR) not in sys.path:
   sys.path.insert(0, str(_PYTORCH_DIR))
 
 from dataset import make_loaders  # noqa: E402
+from eval_mase_uq import roc_auc_score  # noqa: E402
 from mase_lite_net import (  # noqa: E402
   MASE_LITE_DEFAULT,
   MaSELiteConfig,
@@ -31,6 +32,7 @@ from mase_lite_net import (  # noqa: E402
   mase_lite_legacy_loss,
   mase_lite_loss,
   load_partial_state,
+  predictive_entropy,
 )
 
 
@@ -62,6 +64,28 @@ def resolve_device(pref: str = "auto") -> torch.device:
   if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
     return torch.device("mps")
   return torch.device("cpu")
+
+
+@torch.inference_mode()
+def eval_val_uauc_det(
+  model: MaSELiteNet,
+  loader: DataLoader,
+  device: torch.device,
+) -> float:
+  """Deterministic PE UAUC on a loader (cheap val monitor; no MC)."""
+  model.eval()
+  pe_all: list[np.ndarray] = []
+  incorrect_all: list[np.ndarray] = []
+  for images, labels in loader:
+    images = images.to(device, non_blocking=True)
+    labels = labels.to(device, non_blocking=True)
+    log_probs = model(images, train=False, return_details=False)
+    assert isinstance(log_probs, torch.Tensor)
+    probs = log_probs.exp()
+    pred = probs.argmax(dim=-1)
+    pe_all.append(predictive_entropy(probs).cpu().numpy())
+    incorrect_all.append((pred != labels).cpu().numpy().astype(np.int32))
+  return float(roc_auc_score(np.concatenate(incorrect_all), np.concatenate(pe_all)))
 
 
 def run_epoch(
@@ -129,6 +153,40 @@ def run_epoch(
       float(w) for w in details["ensemble_weights"].cpu().tolist()
     ]
   return out
+
+
+def weight_health(
+  weights: list[float] | None,
+  *,
+  min_w: float = 0.10,
+  max_w: float = 0.40,
+) -> dict[str, Any]:
+  if not weights:
+    return {"min_w": float("nan"), "max_w": float("nan"), "ok": False}
+  lo = float(min(weights))
+  hi = float(max(weights))
+  return {"min_w": lo, "max_w": hi, "ok": lo >= min_w and hi <= max_w}
+
+
+def load_phase1_val_acc(path: Path) -> float | None:
+  if not path.exists():
+    return None
+  with path.open() as f:
+    data = json.load(f)
+  val = data.get("best_val_accuracy")
+  return float(val) if val is not None else None
+
+
+def set_phase2_ensemble_only(model: MaSELiteNet) -> int:
+  """Freeze all parameters except ensemble_logits; return trainable count."""
+  n_trainable = 0
+  for name, param in model.named_parameters():
+    if name == "ensemble_logits":
+      param.requires_grad = True
+      n_trainable += param.numel()
+    else:
+      param.requires_grad = False
+  return n_trainable
 
 
 def resolve_default_init(name: str) -> Path | None:
@@ -253,11 +311,150 @@ def main() -> None:
   )
   parser.add_argument("--no-init", action="store_true")
   parser.add_argument(
+    "--resume",
+    type=Path,
+    default=None,
+    help="Full MaSE Lite best.pt to continue from (implies --no-init)",
+  )
+  parser.add_argument(
     "--checkpoint-name",
     type=str,
     default="mase_lite_full_v3",
   )
+  parser.add_argument(
+    "--track-val-uauc",
+    action="store_true",
+    help="After each epoch, log deterministic PE UAUC on val",
+  )
+  parser.add_argument(
+    "--select-by",
+    choices=["acc", "uauc", "acc_uauc"],
+    default="acc",
+    help="Criterion for best.pt (acc_uauc = 0.5*acc + 0.5*uauc; needs --track-val-uauc)",
+  )
+  parser.add_argument(
+    "--v6-phase1",
+    action="store_true",
+    help=(
+      "TP-AHF Phase 1 (= v4 recipe): fused-CE, frozen uniform w=0.25. "
+      "Default checkpoint: mase_lite_full_v6_phase1"
+    ),
+  )
+  parser.add_argument(
+    "--v6-phase2",
+    action="store_true",
+    help=(
+      "TP-AHF Phase 2: resume Phase-1 best.pt, learn mixture weights under "
+      "simplex constraints (ensemble-only by default). "
+      "Default checkpoint: mase_lite_full_v6"
+    ),
+  )
+  parser.add_argument(
+    "--phase2-ensemble-only",
+    action="store_true",
+    help="Train only ensemble_logits (auto-enabled with --v6-phase2)",
+  )
+  parser.add_argument(
+    "--ensemble-lr-ratio",
+    type=float,
+    default=None,
+    help="ensemble_lr = backbone_lr * ratio (v6 Phase 2 default: 0.25)",
+  )
+  parser.add_argument(
+    "--ensemble-temp-start",
+    type=float,
+    default=None,
+    help="Anneal ensemble temperature from this value (v6 Phase 2 default: 1.5)",
+  )
+  parser.add_argument(
+    "--ensemble-temp-end",
+    type=float,
+    default=None,
+    help="Anneal ensemble temperature to this value (v6 Phase 2 default: 1.0)",
+  )
+  parser.add_argument(
+    "--phase1-checkpoint-name",
+    type=str,
+    default="mase_lite_full_v6_phase1",
+    help="Phase-1 folder under checkpoints/ (for Phase-2 resume + val gate)",
+  )
+  parser.add_argument(
+    "--phase1-val-acc",
+    type=float,
+    default=None,
+    help="Override Phase-1 val acc gate for Phase-2 best.pt (else read results.json)",
+  )
+  parser.add_argument(
+    "--max-ensemble-weight",
+    type=float,
+    default=0.40,
+    help="Phase-2 weight health: reject best if max(w) exceeds this",
+  )
+  parser.add_argument(
+    "--min-weight-health",
+    type=float,
+    default=0.10,
+    help="Phase-2 weight health: reject best if min(w) below this",
+  )
   args = parser.parse_args()
+  if args.select_by in ("uauc", "acc_uauc"):
+    args.track_val_uauc = True
+  if args.resume is not None:
+    args.no_init = True
+
+  if args.v6_phase1 and args.v6_phase2:
+    raise SystemExit("Use only one of --v6-phase1 or --v6-phase2 per run")
+  if args.v6_phase2 and args.freeze_ensemble:
+    raise SystemExit("--v6-phase2 conflicts with --freeze-ensemble")
+  if args.v6_phase2 and args.legacy_v2_loss:
+    raise SystemExit("--v6-phase2 requires fused-CE (do not use --legacy-v2-loss)")
+
+  if args.v6_phase1:
+    args.freeze_ensemble = True
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v6_phase1"
+
+  if args.v6_phase2:
+    args.phase2_ensemble_only = True
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v6"
+    if args.epochs == 60:
+      args.epochs = 15
+    if args.patience == 15:
+      args.patience = 5
+    if args.min_ensemble_weight == 0.05:
+      args.min_ensemble_weight = 0.20
+    if args.ensemble_entropy_weight == 0.0:
+      args.ensemble_entropy_weight = 0.02
+    if args.aux_head_weight == 0.5:
+      args.aux_head_weight = 0.0
+    if args.distill_weight == 0.1:
+      args.distill_weight = 0.0
+    if args.mask_sparsity_weight == 0.05:
+      args.mask_sparsity_weight = 0.0
+    if args.ensemble_lr_ratio is None:
+      args.ensemble_lr_ratio = 0.25
+    if args.ensemble_temp_start is None:
+      args.ensemble_temp_start = 1.5
+    if args.ensemble_temp_end is None:
+      args.ensemble_temp_end = 1.0
+    if args.ensemble_temperature == 1.0 and args.ensemble_temp_start is not None:
+      args.ensemble_temperature = args.ensemble_temp_start
+    args.no_learnable_ensemble = False
+    if args.resume is None:
+      phase1_best = (
+        args.data_dir.resolve()
+        / "checkpoints"
+        / args.phase1_checkpoint_name
+        / "best.pt"
+      )
+      if not phase1_best.exists():
+        raise SystemExit(
+          f"--v6-phase2 needs Phase-1 best.pt at {phase1_best}\n"
+          "Run --v6-phase1 first, or pass --resume <path/to/phase1/best.pt>"
+        )
+      args.resume = phase1_best
+      args.no_init = True
 
   exclusive = [
     name
@@ -351,27 +548,81 @@ def main() -> None:
       print(f"ERROR: {exc}", flush=True)
       raise SystemExit(1) from exc
 
+  if args.resume is not None:
+    resume_path = args.resume.resolve()
+    if not resume_path.exists():
+      raise SystemExit(f"--resume not found: {resume_path}")
+    try:
+      state = torch.load(resume_path, map_location=device, weights_only=True)
+    except TypeError:
+      state = torch.load(resume_path, map_location=device)
+    if isinstance(state, dict) and "state_dict" in state:
+      state = state["state_dict"]
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    print(f"Resume from {resume_path}", flush=True)
+    if missing:
+      print(f"  missing keys: {len(missing)}", flush=True)
+    if unexpected:
+      print(f"  unexpected keys: {len(unexpected)}", flush=True)
+    init_info["resume"] = str(resume_path)
+
+  phase1_val_gate = args.phase1_val_acc
+  if args.v6_phase2 and phase1_val_gate is None:
+    phase1_results = (
+      data_dir / "checkpoints" / args.phase1_checkpoint_name / "results.json"
+    )
+    phase1_val_gate = load_phase1_val_acc(phase1_results)
+    if phase1_val_gate is None:
+      print(
+        f"Warning: could not read Phase-1 val from {phase1_results}; "
+        "Phase-2 gate disabled",
+        flush=True,
+      )
+
+  if args.phase2_ensemble_only:
+    if not isinstance(model.ensemble_logits, nn.Parameter):
+      raise SystemExit(
+        "phase2-ensemble-only requires learnable ensemble_logits "
+        "(check --no-learnable-ensemble / --freeze-ensemble)"
+      )
+    n_train = set_phase2_ensemble_only(model)
+    print(
+      f"Phase-2 ensemble-only: training {n_train} params in ensemble_logits",
+      flush=True,
+    )
+
   ens_params = (
     [model.ensemble_logits]
     if isinstance(model.ensemble_logits, nn.Parameter)
     else []
   )
-  ensemble_lr = (
-    args.ensemble_lr if args.ensemble_lr is not None else args.backbone_lr * 5.0
-  )
-  param_groups: list[dict[str, Any]] = [
-    {"params": model.selector.parameters(), "lr": args.selector_lr},
-    {
-      "params": list(model.branch_vgg.parameters())
-      + list(model.branch_resnet.parameters())
-      + list(model.branch_densenet.parameters())
-      + list(model.heads.parameters()),
-      "lr": args.backbone_lr,
-    },
-  ]
-  if ens_params and not args.legacy_v2_loss:
-    param_groups.append({"params": ens_params, "lr": ensemble_lr})
-  optimizer = torch.optim.Adam(param_groups, weight_decay=args.weight_decay)
+  if args.ensemble_lr is not None:
+    ensemble_lr = args.ensemble_lr
+  elif args.ensemble_lr_ratio is not None:
+    ensemble_lr = args.backbone_lr * args.ensemble_lr_ratio
+  else:
+    ensemble_lr = args.backbone_lr * 5.0
+
+  if args.phase2_ensemble_only:
+    optimizer = torch.optim.Adam(
+      ens_params,
+      lr=ensemble_lr,
+      weight_decay=args.weight_decay,
+    )
+  else:
+    param_groups: list[dict[str, Any]] = [
+      {"params": model.selector.parameters(), "lr": args.selector_lr},
+      {
+        "params": list(model.branch_vgg.parameters())
+        + list(model.branch_resnet.parameters())
+        + list(model.branch_densenet.parameters())
+        + list(model.heads.parameters()),
+        "lr": args.backbone_lr,
+      },
+    ]
+    if ens_params and not args.legacy_v2_loss:
+      param_groups.append({"params": ens_params, "lr": ensemble_lr})
+    optimizer = torch.optim.Adam(param_groups, weight_decay=args.weight_decay)
   scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, mode="max", factor=0.5, patience=5, min_lr=1e-6
   )
@@ -433,7 +684,19 @@ def main() -> None:
     loss_desc = "fused_nll + aux_head_ce + kl_distill"
     recipe = "v3"
     tqdm_desc = "MaSELiteV3"
-    if args.v5:
+    if args.v6_phase1:
+      method = "mase_lite_v6_phase1"
+      recipe = "v6_phase1"
+      loss_desc = "TP-AHF Phase1 (= v4): fused_nll + aux + kl | frozen w=0.25"
+      tqdm_desc = "MaSELiteV6P1"
+    elif args.v6_phase2:
+      method = "mase_lite_v6"
+      recipe = "v6_phase2"
+      loss_desc = (
+        "TP-AHF Phase2: fused_nll + ent(w) | simplex min_w + ensemble-only"
+      )
+      tqdm_desc = "MaSELiteV6P2"
+    elif args.v5:
       method = "mase_lite_v5"
       recipe = "v5"
       loss_desc = (
@@ -492,6 +755,8 @@ def main() -> None:
   best_epoch = 0
   patience_counter = 0
   best_state: dict[str, torch.Tensor] | None = None
+  best_score = -1.0
+  best_val_uauc = float("nan")
   t0 = time.time()
 
   epoch_kw = dict(
@@ -503,7 +768,20 @@ def main() -> None:
     ensemble_entropy_weight=args.ensemble_entropy_weight,
   )
 
+  temp_start = args.ensemble_temp_start
+  temp_end = args.ensemble_temp_end
+  anneal_temps = (
+    temp_start is not None
+    and temp_end is not None
+    and abs(temp_start - temp_end) > 1e-9
+  )
+
   for epoch in tqdm(range(args.epochs), desc=tqdm_desc, mininterval=5):
+    if anneal_temps:
+      denom = max(args.epochs - 1, 1)
+      frac = epoch / denom
+      t_cur = temp_start + (temp_end - temp_start) * frac
+      model.ensemble_temperature = max(float(t_cur), 1e-3)
     train_m = run_epoch(
       model,
       train_loader,
@@ -522,28 +800,63 @@ def main() -> None:
     )
     scheduler.step(val_m["accuracy"])
 
+    val_uauc = float("nan")
+    if args.track_val_uauc:
+      val_uauc = eval_val_uauc_det(model, val_loader, device)
+      val_m["uauc_pe_det"] = val_uauc
+
+    if args.select_by == "uauc":
+      select_score = val_uauc
+    elif args.select_by == "acc_uauc":
+      select_score = 0.5 * float(val_m["accuracy"]) + 0.5 * val_uauc
+    else:
+      select_score = float(val_m["accuracy"])
+
     row = {
       "epoch": epoch + 1,
       "train": train_m,
       "val": val_m,
-      "lr": float(optimizer.param_groups[1]["lr"]),
+      "select_score": select_score,
+      "lr": float(optimizer.param_groups[-1]["lr"]),
     }
     history.append(row)
     ew = val_m.get("ensemble_weights")
+    wh = weight_health(
+      ew,
+      min_w=args.min_weight_health,
+      max_w=args.max_ensemble_weight,
+    )
     ew_str = (
       " w=[" + ",".join(f"{x:.2f}" for x in ew) + "]" if ew is not None else ""
     )
+    health_str = ""
+    if ew is not None and args.v6_phase2:
+      health_str = f"  wh={'ok' if wh['ok'] else 'BAD'}"
+    uauc_str = f"  uauc={val_uauc:.3f}" if args.track_val_uauc else ""
+    temp_str = ""
+    if anneal_temps:
+      temp_str = f"  T={model.ensemble_temperature:.2f}"
     print(
       f"  ep{epoch + 1:02d}  "
       f"train={train_m['accuracy']:.3f}  "
       f"val={val_m['accuracy']:.3f}  "
       f"mask={val_m['mask_coverage']:.3f}  "
-      f"loss={val_m['loss']:.4f}{ew_str}",
+      f"loss={val_m['loss']:.4f}{uauc_str}{temp_str}{ew_str}{health_str}",
       flush=True,
     )
 
-    if val_m["accuracy"] > best_val:
-      best_val = val_m["accuracy"]
+    phase2_eligible = True
+    if args.v6_phase2:
+      phase2_eligible = wh["ok"]
+      if phase1_val_gate is not None:
+        phase2_eligible = phase2_eligible and (
+          float(val_m["accuracy"]) >= float(phase1_val_gate)
+        )
+
+    if select_score > best_score and phase2_eligible:
+      best_score = select_score
+      best_val = float(val_m["accuracy"])
+      best_val_uauc = val_uauc
       best_epoch = epoch + 1
       patience_counter = 0
       best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
@@ -554,7 +867,8 @@ def main() -> None:
       if patience_counter >= args.patience:
         print(
           f"Early stop @ epoch {epoch + 1} "
-          f"(best val={best_val:.4f} @ {best_epoch})",
+          f"(best val_acc={best_val:.4f} val_uauc={best_val_uauc:.4f} "
+          f"score={best_score:.4f} @ {best_epoch})",
           flush=True,
         )
         break
@@ -572,30 +886,41 @@ def main() -> None:
   )
 
   elapsed = time.time() - t0
-
-  # Weight health (anti-collapse check for learnable recipes)
-  ew = test_m.get("ensemble_weights")
-  weight_health: dict[str, Any] | None = None
-  if ew is not None:
-    min_w = float(min(ew))
-    max_w = float(max(ew))
-    weight_health = {
-      "min_w": min_w,
-      "max_w": max_w,
-      "ok": bool(min_w >= 0.10 - 1e-6 and max_w <= 0.55 + 1e-6),
-      "rule": "ok if min_w>=0.10 and max_w<=0.55",
+  final_ew = test_m.get("ensemble_weights")
+  wh_max = 0.55 if args.v5 else args.max_ensemble_weight
+  wh_min = args.min_weight_health
+  final_wh = weight_health(final_ew, min_w=wh_min, max_w=wh_max)
+  if args.v5:
+    final_wh["rule"] = "ok if min_w>=0.10 and max_w<=0.55"
+  elif args.v6_phase2:
+    final_wh["rule"] = (
+      f"ok if min_w>={wh_min} and max_w<={args.max_ensemble_weight}"
+    )
+  if args.v5 and final_ew is not None and not final_wh["ok"]:
+    print(
+      f"WARNING: v5 weight health FAIL min={final_wh['min_w']:.3f} "
+      f"max={final_wh['max_w']:.3f} (want min>=0.10 max<=0.55)",
+      flush=True,
+    )
+  tp_ahf: dict[str, Any] | None = None
+  if args.v6_phase1 or args.v6_phase2:
+    tp_ahf = {
+      "phase": recipe,
+      "phase1_checkpoint_name": args.phase1_checkpoint_name,
+      "phase1_val_gate": phase1_val_gate,
+      "phase2_ensemble_only": bool(args.phase2_ensemble_only),
+      "ensemble_lr_ratio": args.ensemble_lr_ratio,
+      "ensemble_temp_start": temp_start,
+      "ensemble_temp_end": temp_end,
+      "max_ensemble_weight": args.max_ensemble_weight,
+      "min_weight_health": args.min_weight_health,
     }
-    if args.v5 and not weight_health["ok"]:
-      print(
-        f"WARNING: v5 weight health FAIL min={min_w:.3f} max={max_w:.3f} "
-        f"(want min>=0.10 max<=0.55)",
-        flush=True,
-      )
-
   results = {
     "method": method,
     "framework": "pytorch",
     "config": config_to_dict(config),
+    "weight_health": final_wh if final_ew is not None else None,
+    "tp_ahf": tp_ahf,
     "optimizations": {
       "recipe": recipe,
       "epochs": args.epochs,
@@ -616,6 +941,12 @@ def main() -> None:
       "loss": loss_desc,
       "branch_dropout": args.branch_dropout,
       "head_dropout": args.head_dropout,
+      "track_val_uauc": args.track_val_uauc,
+      "select_by": args.select_by,
+      "phase2_ensemble_only": bool(args.phase2_ensemble_only),
+      "ensemble_lr_ratio": args.ensemble_lr_ratio,
+      "ensemble_temp_start": temp_start,
+      "ensemble_temp_end": temp_end,
       "init": init_info,
       "with_uq": bool(args.with_uq),
       "uq_mc_samples": args.uq_mc_samples if args.with_uq else None,
@@ -623,8 +954,9 @@ def main() -> None:
     "params": n_params,
     "best_epoch": best_epoch,
     "best_val_accuracy": best_val,
+    "best_val_uauc_pe_det": best_val_uauc,
+    "best_select_score": best_score,
     "test": test_m,
-    "weight_health": weight_health,
     "elapsed_sec": elapsed,
     "history": history,
     "data_dir": str(data_dir),
@@ -712,7 +1044,11 @@ def main() -> None:
     )
 
   print(f"\n=== MaSE-Net Lite {recipe} done ===", flush=True)
-  print(f"Best val: {best_val:.4f} @ epoch {best_epoch}", flush=True)
+  print(
+    f"Best val: acc={best_val:.4f} uauc={best_val_uauc:.4f} "
+    f"score={best_score:.4f} @ epoch {best_epoch} (select_by={args.select_by})",
+    flush=True,
+  )
   print(
     f"Test:     {test_m['accuracy']:.4f}  "
     f"(mask={test_m['mask_coverage']:.3f})",
@@ -720,10 +1056,17 @@ def main() -> None:
   )
   if ew := test_m.get("ensemble_weights"):
     print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
-  if weight_health is not None:
+  if final_ew is not None and (args.v5 or args.v6_phase2):
     print(
-      f"Weight health: min={weight_health['min_w']:.3f} "
-      f"max={weight_health['max_w']:.3f} ok={weight_health['ok']}",
+      f"Weight health: min={final_wh['min_w']:.3f} "
+      f"max={final_wh['max_w']:.3f} ok={final_wh['ok']}",
+      flush=True,
+    )
+  if args.v6_phase2 and phase1_val_gate is not None:
+    beat = float(test_m["accuracy"]) >= float(phase1_val_gate)
+    print(
+      f"vs Phase-1 val gate ({phase1_val_gate:.4f}): "
+      f"test={'PASS' if beat else 'below'}",
       flush=True,
     )
   if args.with_uq and "uq" in results:
