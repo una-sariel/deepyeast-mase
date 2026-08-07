@@ -6,8 +6,9 @@
 |-------|------|-------------------|
 | **Phase 1** | Same as v4: fused-CE, **frozen** w=0.25×4 | `mase_lite_full_v6_phase1` |
 | **Phase 2** | Resume Phase-1; **learn only** `ensemble_logits` with floor + entropy reg | `mase_lite_full_v6` |
+| **Phase 2.5** | Resume Phase-1; learn **`ensemble_logits` + heads** (branches frozen) | `mase_lite_full_v6_phase25` |
 
-**Goal:** beat v4 test **89.58%** with **learnable but constrained** head weights (paper innovation).
+**Goal:** beat v4 test **89.58%** with **learnable but constrained** head weights (paper innovation). **Phase 2.5** is the recommended accuracy push after Phase 2 — see [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
 
@@ -20,7 +21,8 @@
 ```text
 1) <deepyeast_full>\checkpoints\mase_lite_full_v6_phase1\results.json
 2) <deepyeast_full>\checkpoints\mase_lite_full_v6\results.json
-3) <deepyeast_full>\checkpoints\mase_lite_full_v6\uq_mc_dropout\summary.json   (optional Step 4)
+3) <deepyeast_full>\checkpoints\mase_lite_full_v6_phase25\results.json   (recommended after Phase 2)
+4) <deepyeast_full>\checkpoints\mase_lite_full_v6\uq_mc_dropout\summary.json   (optional Step 4)
 ```
 
 ---
