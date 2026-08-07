@@ -28,7 +28,7 @@ Optional: `mase_lite_full_v6_phase25\best.pt` (large; keep on GPU machine if pos
 ## Prerequisites
 
 1. **Full data** at `deepyeast_full` (90,000 images). See [V6_RUN.md](V6_RUN.md) Step 1.
-2. **Phase 1 complete** ([V6_RUN.md](V6_RUN.md) Step 2) **and** a weight file to resume from (`mase_lite_full_v6_phase1\best.pt`, or Phase 2 shortcut below).
+2. **Phase 1 complete** with `mase_lite_full_v6_phase1\best.pt` on disk ([V6_RUN.md](V6_RUN.md) Step 2). If you only have `results.json`, re-run Step 2 first (~2 h).
 3. Latest code with `--v6-phase25`:
 
 ```powershell
@@ -48,50 +48,23 @@ cd $REPO
 
 ---
 
-## Start without Phase-1 `best.pt`
+## No Phase-1 `best.pt`? Re-run Phase 1 first (~2 h)
 
-Phase 1 finished and you sent `results.json`, but **`mase_lite_full_v6_phase1\best.pt` was not kept**. Weights cannot be rebuilt from JSON — use one of the paths below.
-
-### Check what you still have
-
-```powershell
-dir "$DATA\checkpoints\mase_lite_full_v6_phase1\"
-dir "$DATA\checkpoints\mase_lite_full_v6\best.pt"
-```
-
-### Path A — Phase 2 `best.pt` exists (shortcut, ~30–45 min)
-
-Phase 2 training **only updates `ensemble_logits`**; selector, branches, and heads are the same as at the end of Phase 1. You can start Phase 2.5 from the Phase 2 checkpoint.
-
-Read Phase-1 val gate from your existing `results.json`:
-
-```powershell
-python -c "import json; d=json.load(open(r'$DATA\checkpoints\mase_lite_full_v6_phase1\results.json')); print('phase1_val_gate=', d['best_val_accuracy'])"
-```
-
-Run Phase 2.5 (replace `0.8875` with the printed value):
+`results.json` alone cannot restore weights. Re-run [V6_RUN.md Step 2](V6_RUN.md) (same command, `--seed 42`), **keep** `mase_lite_full_v6_phase1\best.pt`, then continue below.
 
 ```powershell
 python pytorch\train_mase_lite.py `
   --data-dir $DATA `
-  --v6-phase25 `
-  --resume "$DATA\checkpoints\mase_lite_full_v6\best.pt" `
-  --phase1-checkpoint-name mase_lite_full_v6_phase1 `
-  --phase1-val-acc 0.8875 `
-  --seed 42
-```
-
-Default output folder is still `mase_lite_full_v6_phase25\`.
-
-### Path B — Re-run Phase 1 (~2 h)
-
-If there is **no** usable `.pt` under Phase 1 or Phase 2, re-run [V6_RUN.md Step 2](V6_RUN.md) (same hyperparams, `--seed 42`).  
-When training finishes, **keep** `mase_lite_full_v6_phase1\best.pt`, then run Phase 2.5 normally:
-
-```powershell
-python pytorch\train_mase_lite.py `
-  --data-dir $DATA `
-  --v6-phase25 `
+  --v6-phase1 `
+  --epochs 60 `
+  --patience 15 `
+  --batch-size 64 `
+  --top-k 40 `
+  --soft-alpha 0.5 `
+  --mask-sparsity-weight 0.05 `
+  --label-smoothing 0.1 `
+  --aux-head-weight 0.5 `
+  --distill-weight 0.1 `
   --seed 42
 ```
 
@@ -188,7 +161,7 @@ python pytorch\train_mase_lite.py `
 
 | Issue | Fix |
 |-------|-----|
-| `--v6-phase25 needs Phase-1 best.pt` | See § *Start without Phase-1 `best.pt`* above |
+| `--v6-phase25 needs Phase-1 best.pt` | Re-run Phase 1 (~2 h); see § *No Phase-1 `best.pt`?* above |
 | All epochs `wh=BAD` | `--min-ensemble-weight 0.22` or `--ensemble-lr-ratio 0.15` |
 | Tiny `.pt` / load error | `git lfs pull` on repo |
 

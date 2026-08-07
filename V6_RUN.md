@@ -129,12 +129,7 @@ Phase 2 / Phase 2.5 load weights from this file; `results.json` alone is not eno
 
 ### Phase 1 done but no `best.pt`
 
-You have `results.json` (numbers logged) but not the weight file. **Pick one:**
-
-| Situation | What to do |
-|-----------|------------|
-| **Phase 2 was run** and `mase_lite_full_v6\best.pt` exists | **Shortcut** — use it as Phase 2.5 start (Phase 2 only changed mixture weights; backbone + heads match Phase 1). See [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) § *Start without Phase-1 `best.pt`*. |
-| **Only** `mase_lite_full_v6_phase1\results.json` | **Re-run Step 2** (~2 h, same command, `seed 42`). This recreates `best.pt`. Keep the file before Phase 2.5. |
+Re-run **Step 2** below (~2 h, same command, `--seed 42`). This recreates `best.pt`. Keep the file before Phase 2.5.
 
 ---
 
