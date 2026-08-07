@@ -187,30 +187,11 @@ See [UQ_MC_DROPOUT.md](UQ_MC_DROPOUT.md). Report **UAUC** (PE) from `summary.jso
 
 ---
 
-## Override paths (if Phase 1 already exists as v4)
-
-If you already have v4 `best.pt` and want to skip re-training Phase 1:
-
-```powershell
-python pytorch\train_mase_lite.py `
-  --data-dir $DATA `
-  --v6-phase2 `
-  --resume "$DATA\checkpoints\mase_lite_full_v4\best.pt" `
-  --phase1-checkpoint-name mase_lite_full_v4 `
-  --phase1-val-acc 0.8947 `
-  --seed 42
-```
-
-(`--phase1-val-acc` = v4 best val from your log; else read from that folder's `results.json`.)
-
----
-
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
 | No `deepyeast_full` after prepare | You ran default prepare → got `deepyeast_5pct`. Re-run with `--fraction 1.0 --out-dir deepyeast_full` |
-| `--v6-phase2 needs Phase-1 best.pt` | Run Step 2 first, or pass `--resume` to an existing v4/v6_phase1 `best.pt` |
 | `w` stuck at 0.25 in Phase 2 | Need `--v6-phase2` (not `--freeze-ensemble`) |
 | All epochs `wh=BAD` | Weights too peaky; try `--min-ensemble-weight 0.22` or lower `--ensemble-lr-ratio 0.15` |
 | Tiny `.pt` / load error | `git lfs pull` |

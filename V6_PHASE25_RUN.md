@@ -1,6 +1,6 @@
 # MaSE-Net Lite v6 — Phase 2.5 (heads + weights fine-tune)
 
-**TP-AHF Phase 2.5** = resume Phase-1 `best.pt`, then train **`ensemble_logits` + 4 progressive heads** while **selector + PLCNN branches stay frozen**.
+**TP-AHF Phase 2.5** = resume Phase-1 checkpoint, then train **`ensemble_logits` + 4 progressive heads** while **selector + PLCNN branches stay frozen**.
 
 | Phase | Trains | Frozen | Checkpoint folder |
 |-------|--------|--------|-------------------|
@@ -18,8 +18,7 @@ See also [V6_RUN.md](V6_RUN.md) (Phase 1/2), [V4_RUN.md](V4_RUN.md).
 ## What to send back
 
 ```text
-1) <deepyeast_full>\checkpoints\mase_lite_full_v6_phase1\results.json   (if re-trained)
-2) <deepyeast_full>\checkpoints\mase_lite_full_v6_phase25\results.json
+1) <deepyeast_full>\checkpoints\mase_lite_full_v6_phase25\results.json
 ```
 
 Optional: `mase_lite_full_v6_phase25\best.pt` (large; keep on GPU machine if possible).
@@ -29,7 +28,7 @@ Optional: `mase_lite_full_v6_phase25\best.pt` (large; keep on GPU machine if pos
 ## Prerequisites
 
 1. **Full data** at `deepyeast_full` (90,000 images). See [V6_RUN.md](V6_RUN.md) Step 1.
-2. **Phase-1 `best.pt`** must exist (Phase 1 = v4 recipe). If lost, re-train Phase 1 first (~2 h).
+2. **Phase 1 complete** ([V6_RUN.md](V6_RUN.md) Step 2).
 3. Latest code with `--v6-phase25`:
 
 ```powershell
@@ -49,39 +48,9 @@ cd $REPO
 
 ---
 
-## Step A — Re-train Phase 1 (only if `best.pt` is missing)
+## Run Phase 2.5 (~30–45 min)
 
-Skip if this file exists:
-
-```powershell
-dir "$DATA\checkpoints\mase_lite_full_v6_phase1\best.pt"
-```
-
-If missing, run (~2 h):
-
-```powershell
-python pytorch\train_mase_lite.py `
-  --data-dir $DATA `
-  --v6-phase1 `
-  --epochs 60 `
-  --patience 15 `
-  --batch-size 64 `
-  --top-k 40 `
-  --soft-alpha 0.5 `
-  --mask-sparsity-weight 0.05 `
-  --label-smoothing 0.1 `
-  --aux-head-weight 0.5 `
-  --distill-weight 0.1 `
-  --seed 42
-```
-
-Target: test **≥ ~0.889** (historical v4 best **89.58%**).
-
----
-
-## Step B — Phase 2.5 (~30–45 min)
-
-Auto-resumes Phase-1 `best.pt` from Step A.
+Auto-resumes Phase-1 checkpoint from [V6_RUN.md](V6_RUN.md) Step 2.
 
 ```powershell
 python pytorch\train_mase_lite.py `
@@ -132,7 +101,7 @@ $DATA\checkpoints\mase_lite_full_v6_phase25\
 
 ## Overrides
 
-Resume from a custom Phase-1 checkpoint:
+Custom Phase-1 resume path:
 
 ```powershell
 python pytorch\train_mase_lite.py `
@@ -161,7 +130,7 @@ python pytorch\train_mase_lite.py `
 | Phase 2.5 test | Next step |
 |----------------|-----------|
 | **≥ 90%** | Done — report numbers |
-| **89.5% – 90%** | TTA eval on `best.pt` (no retrain) |
+| **89.5% – 90%** | TTA eval on checkpoint (no retrain) |
 | **< 89.5%** | 3-seed ensemble or ID-Gate (separate experiments) |
 
 ---
@@ -170,9 +139,7 @@ python pytorch\train_mase_lite.py `
 
 | Issue | Fix |
 |-------|-----|
-| `--v6-phase25 needs Phase-1 best.pt` | Run Step A (`--v6-phase1`) |
 | All epochs `wh=BAD` | `--min-ensemble-weight 0.22` or `--ensemble-lr-ratio 0.15` |
-| val below Phase-1 gate, no `best.pt` | Normal if fine-tune hurts val; report last epoch + try lower `--phase25-head-lr` |
 | Tiny `.pt` / load error | `git lfs pull` on repo |
 
 ---
