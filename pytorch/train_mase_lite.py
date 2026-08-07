@@ -375,6 +375,20 @@ def main() -> None:
     ),
   )
   parser.add_argument(
+    "--v7",
+    action="store_true",
+    help=(
+      "MaSE Lite v7: tuned Phase 2.5 (head_lr=1e-5, ens_lr_ratio=0.15, "
+      "patience=3). Default checkpoint: mase_lite_full_v7. "
+      "Run eval_mase_tta.py after (or pass --with-tta)."
+    ),
+  )
+  parser.add_argument(
+    "--with-tta",
+    action="store_true",
+    help="After test: TTA eval on best.pt → tta_eval/summary.json",
+  )
+  parser.add_argument(
     "--phase25-head-lr",
     type=float,
     default=None,
@@ -432,6 +446,11 @@ def main() -> None:
     args.track_val_uauc = True
   if args.resume is not None:
     args.no_init = True
+
+  if args.v7:
+    if args.v6_phase1 or args.v6_phase2 or args.v6_phase25:
+      raise SystemExit("--v7 cannot combine with --v6-phase1/2/25")
+    args.v6_phase25 = True
 
   tp_phase_flags = [args.v6_phase1, args.v6_phase2, args.v6_phase25]
   if sum(tp_phase_flags) > 1:
@@ -496,7 +515,9 @@ def main() -> None:
 
   if args.v6_phase25:
     if args.checkpoint_name == "mase_lite_full_v3":
-      args.checkpoint_name = "mase_lite_full_v6_phase25"
+      args.checkpoint_name = (
+        "mase_lite_full_v7" if args.v7 else "mase_lite_full_v6_phase25"
+      )
     if args.epochs == 60:
       args.epochs = 15
     if args.patience == 15:
@@ -536,6 +557,14 @@ def main() -> None:
         )
       args.resume = phase1_best
       args.no_init = True
+
+  if args.v7:
+    if "--phase25-head-lr" not in sys.argv:
+      args.phase25_head_lr = 1e-5
+    if "--ensemble-lr-ratio" not in sys.argv:
+      args.ensemble_lr_ratio = 0.15
+    if args.patience == 5 and "--patience" not in sys.argv:
+      args.patience = 3
 
   exclusive = [
     name
@@ -648,7 +677,7 @@ def main() -> None:
     init_info["resume"] = str(resume_path)
 
   phase1_val_gate = args.phase1_val_acc
-  if (args.v6_phase2 or args.v6_phase25) and phase1_val_gate is None:
+  if (args.v6_phase2 or args.v6_phase25 or args.v7) and phase1_val_gate is None:
     phase1_results = (
       data_dir / "checkpoints" / args.phase1_checkpoint_name / "results.json"
     )
@@ -797,6 +826,13 @@ def main() -> None:
         "TP-AHF Phase2: fused_nll + ent(w) | simplex min_w + ensemble-only"
       )
       tqdm_desc = "MaSELiteV6P2"
+    elif args.v7:
+      method = "mase_lite_v7"
+      recipe = "v7"
+      loss_desc = (
+        "v7: tuned Phase2.5 fused_nll + ent(w) | head_lr=1e-5 ens_ratio=0.15"
+      )
+      tqdm_desc = "MaSELiteV7"
     elif args.v6_phase25:
       method = "mase_lite_v6_phase25"
       recipe = "v6_phase25"
@@ -839,9 +875,10 @@ def main() -> None:
         f"v5 learnable anti-collapse ens_lr={ensemble_lr:g} "
         f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
       )
-    elif args.v6_phase25:
+    elif args.v6_phase25 or args.v7:
+      label = "v7" if args.v7 else "Phase2.5"
       ens_mode = (
-        f"Phase2.5 heads_lr={args.phase25_head_lr:g} "
+        f"{label} heads_lr={args.phase25_head_lr:g} "
         f"ens_lr={ensemble_lr:g} min_w={args.min_ensemble_weight} "
         f"ent_w={args.ensemble_entropy_weight}"
       )
@@ -944,7 +981,7 @@ def main() -> None:
       " w=[" + ",".join(f"{x:.2f}" for x in ew) + "]" if ew is not None else ""
     )
     health_str = ""
-    if ew is not None and (args.v6_phase2 or args.v6_phase25):
+    if ew is not None and (args.v6_phase2 or args.v6_phase25 or args.v7):
       health_str = f"  wh={'ok' if wh['ok'] else 'BAD'}"
     uauc_str = f"  uauc={val_uauc:.3f}" if args.track_val_uauc else ""
     temp_str = ""
@@ -960,7 +997,7 @@ def main() -> None:
     )
 
     phase_gate_eligible = True
-    if args.v6_phase2 or args.v6_phase25:
+    if args.v6_phase2 or args.v6_phase25 or args.v7:
       phase_gate_eligible = wh["ok"]
       if phase1_val_gate is not None:
         phase_gate_eligible = phase_gate_eligible and (
@@ -1006,7 +1043,7 @@ def main() -> None:
   final_wh = weight_health(final_ew, min_w=wh_min, max_w=wh_max)
   if args.v5:
     final_wh["rule"] = "ok if min_w>=0.10 and max_w<=0.55"
-  elif args.v6_phase2 or args.v6_phase25:
+  elif args.v6_phase2 or args.v6_phase25 or args.v7:
     final_wh["rule"] = (
       f"ok if min_w>={wh_min} and max_w<={args.max_ensemble_weight}"
     )
@@ -1017,14 +1054,15 @@ def main() -> None:
       flush=True,
     )
   tp_ahf: dict[str, Any] | None = None
-  if args.v6_phase1 or args.v6_phase2 or args.v6_phase25:
+  if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v7:
     tp_ahf = {
       "phase": recipe,
       "phase1_checkpoint_name": args.phase1_checkpoint_name,
       "phase1_val_gate": phase1_val_gate,
       "phase2_ensemble_only": bool(args.phase2_ensemble_only),
-      "phase25_unfreeze_heads": bool(args.v6_phase25),
+      "phase25_unfreeze_heads": bool(args.v6_phase25 and not args.v6_phase2),
       "phase25_head_lr": args.phase25_head_lr if args.v6_phase25 else None,
+      "v7": bool(args.v7),
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
       "ensemble_temp_start": temp_start,
       "ensemble_temp_end": temp_end,
@@ -1060,13 +1098,15 @@ def main() -> None:
       "track_val_uauc": args.track_val_uauc,
       "select_by": args.select_by,
       "phase2_ensemble_only": bool(args.phase2_ensemble_only),
-      "v6_phase25": bool(args.v6_phase25),
+      "v6_phase25": bool(args.v6_phase25 and not args.v7),
+      "v7": bool(args.v7),
       "phase25_head_lr": args.phase25_head_lr if args.v6_phase25 else None,
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
       "ensemble_temp_start": temp_start,
       "ensemble_temp_end": temp_end,
       "init": init_info,
       "with_uq": bool(args.with_uq),
+      "with_tta": bool(args.with_tta),
       "uq_mc_samples": args.uq_mc_samples if args.with_uq else None,
     },
     "params": n_params,
@@ -1080,6 +1120,46 @@ def main() -> None:
     "data_dir": str(data_dir),
     "seed": args.seed,
   }
+
+  if args.with_tta:
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    with (ckpt_dir / "results.json").open("w") as f:
+      json.dump(results, f, indent=2)
+    from eval_mase_tta import run_tta_eval  # noqa: E402
+
+    print("\n=== TTA eval (flip + rot90, no retrain) ===", flush=True)
+    tta_payload = run_tta_eval(
+      data_dir=data_dir,
+      checkpoint=ckpt_dir / "best.pt",
+      results_json=ckpt_dir / "results.json",
+      split="both",
+      tta_mode="flip_rot",
+      batch_size=args.batch_size,
+      device_pref=args.device,
+      seed=args.seed,
+      out_dir=ckpt_dir / "tta_eval",
+    )
+    results["tta"] = {
+      "tta_mode": tta_payload.get("tta_mode"),
+      "n_views": tta_payload.get("n_views"),
+      "test_baseline_accuracy": tta_payload.get("test_baseline_accuracy"),
+      "test_tta_accuracy": tta_payload.get("test_tta_accuracy"),
+      "test_tta_gain_pp": tta_payload.get("test_tta_gain_pp"),
+      "val_baseline_accuracy": tta_payload.get("splits", {})
+      .get("val", {})
+      .get("baseline_accuracy"),
+      "val_tta_accuracy": tta_payload.get("splits", {})
+      .get("val", {})
+      .get("tta_accuracy"),
+    }
+    if results["tta"].get("test_tta_accuracy") is not None:
+      print(
+        f"  test: baseline={results['tta']['test_baseline_accuracy']:.4f}  "
+        f"tta={results['tta']['test_tta_accuracy']:.4f}  "
+        f"gain={results['tta']['test_tta_gain_pp']:+.2f}pp",
+        flush=True,
+      )
+    print(f"TTA saved: {ckpt_dir / 'tta_eval' / 'summary.json'}", flush=True)
 
   # PE → AUROC (primary UQ metric = UAUC)
   if args.with_uq:
@@ -1174,13 +1254,13 @@ def main() -> None:
   )
   if ew := test_m.get("ensemble_weights"):
     print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
-  if final_ew is not None and (args.v5 or args.v6_phase2 or args.v6_phase25):
+  if final_ew is not None and (args.v5 or args.v6_phase2 or args.v6_phase25 or args.v7):
     print(
       f"Weight health: min={final_wh['min_w']:.3f} "
       f"max={final_wh['max_w']:.3f} ok={final_wh['ok']}",
       flush=True,
     )
-  if (args.v6_phase2 or args.v6_phase25) and phase1_val_gate is not None:
+  if (args.v6_phase2 or args.v6_phase25 or args.v7) and phase1_val_gate is not None:
     beat = float(test_m["accuracy"]) >= float(phase1_val_gate)
     print(
       f"vs Phase-1 val gate ({phase1_val_gate:.4f}): "

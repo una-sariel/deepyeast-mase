@@ -11,7 +11,8 @@
 **Full data v2 (seed=42):** test **89.1%** (Keras 88.4%).  
 **Full data v3 (learnable):** test **87.75%** (weight collapse).  
 **Recommended now:** **v4** fused-CE + **frozen uniform** weights (see [V4_RUN.md](V4_RUN.md)).  
-**New — learnable fusion:** **v6 TP-AHF** ([V6_RUN.md](V6_RUN.md); accuracy push: [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md)).
+**New — learnable fusion:** **v6 TP-AHF** ([V6_RUN.md](V6_RUN.md); Phase 2.5: [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md)).  
+**Accuracy push:** **v7** tuned Phase 2.5 + TTA ([V7_RUN.md](V7_RUN.md)).
 
 ---
 
