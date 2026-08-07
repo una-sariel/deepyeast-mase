@@ -123,6 +123,19 @@ Default checkpoint: `$DATA\checkpoints\mase_lite_full_v6_phase1\`
 
 Wall time: ~**2 h** on GPU.
 
+**Keep the weight file:** after Step 2, leave  
+`$DATA\checkpoints\mase_lite_full_v6_phase1\best.pt` (~28 MB) on disk.  
+Phase 2 / Phase 2.5 load weights from this file; `results.json` alone is not enough.
+
+### Phase 1 done but no `best.pt`
+
+You have `results.json` (numbers logged) but not the weight file. **Pick one:**
+
+| Situation | What to do |
+|-----------|------------|
+| **Phase 2 was run** and `mase_lite_full_v6\best.pt` exists | **Shortcut** — use it as Phase 2.5 start (Phase 2 only changed mixture weights; backbone + heads match Phase 1). See [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) § *Start without Phase-1 `best.pt`*. |
+| **Only** `mase_lite_full_v6_phase1\results.json` | **Re-run Step 2** (~2 h, same command, `seed 42`). This recreates `best.pt`. Keep the file before Phase 2.5. |
+
 ---
 
 ## Step 3 — Phase 2 (learn head weights, ~15 epochs)
