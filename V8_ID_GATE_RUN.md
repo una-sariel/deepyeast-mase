@@ -30,40 +30,6 @@ See also [FINE_TUNING_V5_TO_V7.md](FINE_TUNING_V5_TO_V7.md), [V7_RUN.md](V7_RUN.
 
 > We adopt a soft, input-dependent gating network in the sense of Jacobs et al. (1991): given branch features \(x=\mathrm{concat}(v,r,d)\), a lightweight MLP produces logits over the four progressive heads; mixture weights \(w(x)=\mathrm{softmax}(g(x)/T)\) combine head probabilities. Unlike sparse MoE (Shazeer et al., 2017), all four heads remain active (dense soft gating). Unlike our Phase‑2 global logits, \(w\) varies per image. We fine-tune the gate and heads from a Phase‑1 checkpoint with a minimum-weight floor and entropy regularization to avoid single-head collapse.
 
-### BibTeX
-
-```bibtex
-@article{jacobs1991adaptive,
-  title   = {Adaptive Mixtures of Local Experts},
-  author  = {Jacobs, Robert A. and Jordan, Michael I. and Nowlan, Steven J. and Hinton, Geoffrey E.},
-  journal = {Neural Computation},
-  volume  = {3},
-  number  = {1},
-  pages   = {79--87},
-  year    = {1991},
-  doi     = {10.1162/neco.1991.3.1.79}
-}
-
-@article{jordan1994hierarchical,
-  title   = {Hierarchical Mixtures of Experts and the {EM} Algorithm},
-  author  = {Jordan, Michael I. and Jacobs, Robert A.},
-  journal = {Neural Computation},
-  volume  = {6},
-  number  = {2},
-  pages   = {181--214},
-  year    = {1994},
-  doi     = {10.1162/neco.1994.6.2.181}
-}
-
-@inproceedings{shazeer2017outrageously,
-  title     = {Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer},
-  author    = {Shazeer, Noam and Mirhoseini, Azalia and Maziarz, Krzysztof and Davis, Andy and Le, Quoc and Hinton, Geoffrey and Dean, Jeff},
-  booktitle = {International Conference on Learning Representations (ICLR)},
-  year      = {2017},
-  url       = {https://arxiv.org/abs/1701.06538}
-}
-```
-
 ---
 
 ## What to send back
