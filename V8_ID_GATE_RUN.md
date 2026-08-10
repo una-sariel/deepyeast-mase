@@ -12,7 +12,7 @@
 Still **one model** (not multi-seed ensemble).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-See also [FINE_TUNING_V5_TO_V7.md](FINE_TUNING_V5_TO_V7.md), [V7_RUN.md](V7_RUN.md).
+See also [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md), [V7_RUN.md](V7_RUN.md).
 
 ---
 

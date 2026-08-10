@@ -1,25 +1,26 @@
-# MaSE Lite fine-tuning log: v5 → v7 (+ TTA)
+# MaSE Lite fine-tuning log: v4 → v7 (+ TTA)
 
 **Scope:** full-data (90k), seed=42, same `MaSELiteNet` architecture.  
-**Goal:** push test accuracy from ~89.6% toward **90%**, with learnable but healthy head fusion.
+**Goal:** push test accuracy from v4 (~89.6%) toward **90%**, with learnable but healthy head fusion.
 
 JSON evidence: [results/README.md](results/README.md).
 
 ---
 
-## Baseline before this arc
+## Context before v4
 
 | Version | Idea | Full-data test | Outcome |
 |---------|------|----------------|---------|
 | v2 | head-mean CE; w stuck 0.25 | 89.1% | solid |
 | v3 | fused-CE; unconstrained learnable w | 87.75% | **weight collapse** (~0.78 on one head) |
-| **v4** | fused-CE; **frozen** w=0.25×4 | **≈89.58%** | accuracy SOTA (single model, no TTA) |
 
 ---
 
-## Stage map (what we changed)
+## Stage map (v4 → v7)
 
 ```text
+v4          fused-CE + frozen uniform w=0.25  (accuracy SOTA, no TTA)
+    ↓
 v5          single-phase learnable w + anti-collapse
     ↓
 v6 Phase1   = v4 recipe again (frozen w) — TP-AHF base
@@ -33,7 +34,22 @@ TTA         flip + rot90 at eval (no retrain) on Phase2.5 and v7
 
 ---
 
-## 1. v5 — learnable fusion, one-shot anti-collapse
+## 1. v4 — frozen uniform fusion (starting point)
+
+| Item | Detail |
+|------|--------|
+| Flag | `--freeze-ensemble` (also `--v6-phase1` = same recipe) |
+| Train | full model; **frozen** w=0.25×4 |
+| Loss | fused-CE + aux + distill + sparsity |
+| Full-data test | **≈89.58%** (historical best single-model train, no TTA) |
+| Weights | `[0.25, 0.25, 0.25, 0.25]` |
+| Lesson | Avoids v3 collapse; strong accuracy baseline for all later fine-tunes. |
+
+Doc: [V4_RUN.md](V4_RUN.md)
+
+---
+
+## 2. v5 — learnable fusion, one-shot anti-collapse
 
 | Item | Detail |
 |------|--------|
@@ -49,7 +65,7 @@ Doc: [V5_RUN.md](V5_RUN.md)
 
 ---
 
-## 2. v6 Phase 1 — TP-AHF base (= v4 recipe)
+## 3. v6 Phase 1 — TP-AHF base (= v4 recipe)
 
 | Item | Detail |
 |------|--------|
@@ -66,7 +82,7 @@ Doc: [V6_RUN.md](V6_RUN.md)
 
 ---
 
-## 3. v6 Phase 2 — calibrate global w only
+## 4. v6 Phase 2 — calibrate global w only
 
 | Item | Detail |
 |------|--------|
@@ -79,7 +95,7 @@ Doc: [V6_RUN.md](V6_RUN.md)
 
 ---
 
-## 4. v6 Phase 2.5 — co-adapt heads + w
+## 5. v6 Phase 2.5 — co-adapt heads + w
 
 | Item | Detail |
 |------|--------|
@@ -99,7 +115,7 @@ Analysis: `results/head_contrib_10pct/`
 
 ---
 
-## 5. v7 — tuned Phase 2.5
+## 6. v7 — tuned Phase 2.5
 
 | Item | Detail |
 |------|--------|
@@ -115,7 +131,7 @@ Doc: [V7_RUN.md](V7_RUN.md)
 
 ---
 
-## 6. TTA — inference-only boost (no retrain)
+## 7. TTA — inference-only boost (no retrain)
 
 | Checkpoint | Baseline test | + TTA (`flip_rot`, 7 views) | Gain |
 |------------|---------------|----------------------------|------|
@@ -123,9 +139,10 @@ Doc: [V7_RUN.md](V7_RUN.md)
 | v7 | 89.07% | **89.82%** | **+0.74pp** |
 
 Sources: `results/v6/phase25_tta_summary.json`, `results/v7/tta_summary.json`  
-Script: `pytorch/eval_mase_tta.py`
+Script: `pytorch/eval_mase_tta.py`  
+Paper: Shanmugam et al., ICCV 2021 — [arXiv:2011.11156](https://arxiv.org/abs/2011.11156) (uniform mean aggregator).
 
-**Lesson:** Largest single step after v4 toward 90%. Still **~0.18pp short** of 90%.
+**Lesson:** Largest single step after v4 toward 90%. Still **~0.18pp short** of 90%. Report train and TTA as separate rows.
 
 ---
 
@@ -133,19 +150,22 @@ Script: `pytorch/eval_mase_tta.py`
 
 | Step | Test | Δ vs previous meaningful base |
 |------|------|-------------------------------|
-| v4 (historical best train) | ≈89.58% | — |
+| **v4** (historical best train) | **≈89.58%** | arc start |
 | v5 | ~89.16% | −0.42pp vs v4 (failed to beat) |
-| v6 Phase 1 | 88.95% | base for TP-AHF |
+| v6 Phase 1 | 88.95% | TP-AHF base (≈ v4 recipe) |
 | v6 Phase 2 | ~89.01% | +0.06pp vs P1 |
 | v6 Phase 2.5 | 89.07% | +0.12pp vs P1 |
 | v7 | 89.06% | ≈ Phase 2.5 |
-| **Phase 2.5 / v7 + TTA** | **89.82%** | **+0.74pp** vs train |
+| **Phase 2.5 / v7 + TTA** | **89.82%** | **+0.74pp** vs train; **+0.24pp** vs v4 train |
 
 ```text
-88.95% ──P2──► 89.01% ──P2.5──► 89.07% ──v7──► 89.06%
-                                              │
-                                         TTA  ▼
-                                           89.82%  ··· goal 90%
+v4 ≈89.58%
+        │
+        ▼
+v5 ~89.16% ──► P1 88.95% ──P2──► 89.01% ──P2.5──► 89.07% ──v7──► 89.06%
+                                                                  │
+                                                             TTA  ▼
+                                                               89.82%  ··· goal 90%
 ```
 
 ---
@@ -154,10 +174,10 @@ Script: `pytorch/eval_mase_tta.py`
 
 | Worked | Did not work (for +0.4pp+) |
 |--------|---------------------------|
-| Frozen uniform v4 as strong base | v5 single-phase learnable beating v4 |
+| **v4 frozen uniform** as strong train baseline | v5 single-phase learnable beating v4 |
 | Constrained w (no v3-style collapse) | Phase 2 (w-only) alone |
 | Phase 2.5 small train gain + paper story | Expecting global w to leave 0.25×4 |
-| **TTA +0.74pp** | v7 LR retune vs Phase 2.5 |
+| **TTA +0.74pp** (beats v4 train when stacked) | v7 LR retune vs Phase 2.5 |
 
 ---
 
@@ -165,11 +185,12 @@ Script: `pytorch/eval_mase_tta.py`
 
 | Artifact | Path |
 |----------|------|
+| v4 run doc | [V4_RUN.md](V4_RUN.md) |
 | Phase 1 results | `results/v6/phase1_results.json` |
 | Phase 2.5 results | `results/v6/phase25_results.json` |
 | Phase 2.5 TTA | `results/v6/phase25_tta_summary.json` |
 | v7 results | `results/v7/results.json` |
 | v7 TTA | `results/v7/tta_summary.json` |
 | Head contribution (10%) | `results/head_contrib_10pct/` |
-| Train flags | `pytorch/train_mase_lite.py` (`--v5`, `--v6-phase*`, `--v7`) |
+| Train flags | `pytorch/train_mase_lite.py` (`--freeze-ensemble`, `--v5`, `--v6-phase*`, `--v7`) |
 | TTA eval | `pytorch/eval_mase_tta.py` |
