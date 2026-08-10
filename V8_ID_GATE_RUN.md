@@ -131,36 +131,36 @@ Report **train** and **TTA** as separate rows.
 
 ---
 
-## What “ID-Gate” means (plain language)
+## 「ID-Gate」是什么（中文说明）
 
-**ID-Gate** = **I**nput-**D**ependent gate. It is a **project nickname**, not a published method name. The underlying idea is soft **Mixture-of-Experts** gating (Jacobs et al., 1991): a small network looks at the current image’s features and decides how much to trust each of the four progressive heads.
+**ID-Gate** = **I**nput-**D**ependent gate（输入相关门控）。这是项目里的叫法，不是某篇论文的正式方法名。背后对应的是软 **Mixture-of-Experts（MoE）门控**（Jacobs et al., 1991）：一个小网络根据**当前这张图**的特征，决定四个 progressive head 各占多少权重。
 
-### Before v8 (Phase 2.5 / v7)
+### v8 之前（Phase 2.5 / v7）
 
-- Fusion uses **one global weight vector** `w = [w_V, w_R, w_D, w_F]` shared by **every** image.
-- Those four numbers are learned once (or frozen) and do not change with the input.
+- 融合用的是**全局**一套权重 `w = [w_V, w_R, w_D, w_F]`，**所有图像共用**。
+- 这四个数学完（或冻结）后，不随输入变化。
 
-### After v8 (ID-Gate)
+### v8（ID-Gate）
 
-- Fusion uses **per-image** weights `w(x)`.
-- A small MLP (`id_gate`) reads branch features  
+- 融合变成**逐样本**权重 `w(x)`。
+- 小 MLP（`id_gate`）读取三支路特征  
   \(x = \mathrm{concat}(v, r, d)\)  
-  (VGG / ResNet / DenseNet branch embeddings) and outputs 4 logits → Softmax → `w(x)`.
-- Final prediction: mix the four head probability vectors with `w(x)` (dense soft gating — all heads stay active; not sparse Top‑k MoE).
+  （VGG / ResNet / DenseNet 分支嵌入），输出 4 维 logits → Softmax → `w(x)`。
+- 最终预测：用 `w(x)` 对四个 head 的概率做加权混合（稠密软门控——四个头都参与；不是稀疏 Top‑k MoE）。
 
-| | Global fusion | **ID-Gate** |
-|--|---------------|-------------|
-| Weights | same `w` for all images | different `w(x)` per image |
-| Who decides | fixed / learned scalars | MLP conditioned on this image’s `v,r,d` |
-| Intuition | “always blend heads the same way” | “route this image to the heads that fit it” |
+| | 全局融合 | **ID-Gate** |
+|--|----------|-------------|
+| 权重 | 所有图同一套 `w` | 每张图不同的 `w(x)` |
+| 谁决定 | 固定/学到的标量 | 由该图的 `v,r,d` 条件化的 MLP |
+| 直觉 | 「永远用同一种方式混四个头」 | 「按这张图把流量分给更合适的头」 |
 
-### Why fine-tune this way
+### 为什么这样微调
 
-- Start from a strong Phase‑1 checkpoint (selector + PLCNN branches already trained).
-- **Freeze** selector + branches; **train** only `id_gate` + the four heads (plus min-weight / entropy regularizers so one head does not collapse).
-- Gate last layer is **zero-init**, so early `w(x)` is near uniform, then learns sample-wise routing.
+- 从已训好的 Phase‑1 checkpoint 出发（selector + PLCNN 分支已学好）。
+- **冻结** selector + 分支；**只训** `id_gate` + 四个 head（并加最小权重 / 熵正则，避免单头塌缩）。
+- Gate 最后一层 **零初始化**，一开始 `w(x)` 接近均匀，再逐渐学到按样本分流。
 
-### One-line takeaway
+### 一句话
 
-> **ID-Gate = learn an input-dependent soft mix of the four MaSE heads, instead of one global mix for the whole dataset.**
+> **ID-Gate = 学「随输入变化」的四头软混合，而不是全数据集共用一套全局混合权重。**
 
