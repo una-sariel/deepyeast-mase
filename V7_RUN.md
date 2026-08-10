@@ -98,6 +98,15 @@ python pytorch\eval_mase_tta.py `
 
 Optional one-shot (train + TTA): `--v7 --with-tta`
 
+### Related paper (TTA)
+
+We use the standard practice of averaging class probabilities over geometric transforms of each test image (flips / 90° rotations). For a focused study of this **test-time augmentation** setup (and of simple averaging as the default aggregator), see:
+
+- Shanmugam, Blalock, Balakrishnan, Guttag. **Better Aggregation in Test-Time Augmentation.** ICCV 2021.  
+  [CVF open access](https://openaccess.thecvf.com/content/ICCV2021/html/Shanmugam_Better_Aggregation_in_Test-Time_Augmentation_ICCV_2021_paper.html) · [arXiv:2011.11156](https://arxiv.org/abs/2011.11156)
+
+Our `eval_mase_tta.py` implements the common **uniform mean** over views (their baseline aggregator), not their learned AugTTA/ClassTTA weights.
+
 ---
 
 ## 5. Send back these 3 files
