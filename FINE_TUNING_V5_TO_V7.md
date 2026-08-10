@@ -161,18 +161,6 @@ Script: `pytorch/eval_mase_tta.py`
 
 ---
 
-## Next: v8 ID-Gate (single-model fine-tune)
-
-Sample-wise fusion `w(x)` via a small MLP on `concat(v,r,d)`.  
-Resume Phase-1; train **id_gate + heads**; freeze selector/branches.
-
-See [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) (`--v8`).
-
-Do **not** expect another Phase2.5 / v7 LR grid alone to cross 90%.  
-Report train and TTA as **separate rows** in any paper table.
-
----
-
 ## File index
 
 | Artifact | Path |
