@@ -41,7 +41,7 @@ TTA         flip + rot90 at eval (no retrain) on Phase2.5 and v7
 | Flag | `--freeze-ensemble` (also `--v6-phase1` = same recipe) |
 | Train | full model; **frozen** w=0.25×4 |
 | Loss | fused-CE + aux + distill + sparsity |
-| Full-data test | **≈89.58%** (`results/v4/full_results.json`) |
+| Full-data test | **≈89.58%** |
 | Weights | `[0.25, 0.25, 0.25, 0.25]` |
 | Lesson | Avoids v3 collapse; strong accuracy baseline for all later fine-tunes. |
 
@@ -57,7 +57,7 @@ Doc: [V4_RUN.md](V4_RUN.md)
 | Train | full model; learnable `ensemble_logits` |
 | Anti-collapse | `min_w=0.15`, `ent_w=0.01`, `ens_lr=0.5×` backbone |
 | UQ | MC Dropout on by default |
-| Reported test | **~89.16%** (`results/v5/full_results.json`; below v4) |
+| Reported test | **~89.16%** (below v4) |
 | Weights | max w ≈ **0.44** (healthier than v3, still peaky vs v4) |
 | UQ | test UAUC(PE) **0.9249** (MC T=30) |
 | Lesson | Learnable w can avoid hard collapse, but **did not beat frozen v4**. Need stronger constraints / two-phase training. |
@@ -91,7 +91,7 @@ Doc: [V6_RUN.md](V6_RUN.md)
 | Resume | Phase-1 `best.pt` |
 | Trainable | **`ensemble_logits` only** (backbone + heads frozen) |
 | Constraints | `min_w=0.20`, `ent_w=0.02`, T: 1.5→1.0, gate vs Phase-1 val |
-| Test (approx) | **~89.01%** (`results/v6/phase2_results.json`; +~0.06pp vs Phase 1) |
+| Test (approx) | **~89.01%** (+~0.06pp vs Phase 1) |
 | Lesson | Global 4-scalar fusion has **too little capacity**. Need to move heads or w(x). |
 
 ---
@@ -187,10 +187,7 @@ v5 ~89.16% ──► P1 88.95% ──P2──► 89.01% ──P2.5──► 89.0
 | Artifact | Path |
 |----------|------|
 | v4 run doc | [V4_RUN.md](V4_RUN.md) |
-| v4 full results | `results/v4/full_results.json` |
-| v5 full results | `results/v5/full_results.json` |
 | Phase 1 results | `results/v6/phase1_results.json` |
-| Phase 2 results | `results/v6/phase2_results.json` |
 | Phase 2.5 results | `results/v6/phase25_results.json` |
 | Phase 2.5 TTA | `results/v6/phase25_tta_summary.json` |
 | v7 results | `results/v7/results.json` |

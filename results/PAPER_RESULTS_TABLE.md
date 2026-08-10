@@ -21,7 +21,7 @@ Last local update: 2026-07-27. Full-data cells filled from professor runs when J
 | 5% v4 `best.pt` | test | *running eval* | *running* | `.../v4_default/uq_mc_dropout/` |
 | 5% v5 `best.pt` | test | after train | after train | embedded `--with-uq` |
 | Full v4 | test | TBD | TBD | ask professor for `uq_mc_dropout/summary.json` |
-| Full v5 | test | **0.9249** | — | `results/v5/full_results.json` |
+| Full v5 | test | **0.9249** | — | professor run summary |
 
 Do **not** treat Softmax `UAUC_via_1_minus_maxprob` as the primary UQ claim.
 
@@ -29,7 +29,5 @@ Do **not** treat Softmax `UAUC_via_1_minus_maxprob` as the primary UQ claim.
 
 - v2 5%: `results/v2/5pct_results.json`
 - v4 5%: `results/v4/5pct_results.json` (test 0.8587)
-- v4 full: `results/v4/full_results.json` (test 0.8958)
-- v5 full: `results/v5/full_results.json` (test 0.8916, UAUC 0.9249)
-- v6/v7: `results/v6/`, `results/v7/`
 - Ablation ranking: `results/full_friendly_ablation_summary.jsonl`
+- Full-data numbers: see accuracy table above / [FINE_TUNING_V4_TO_V7.md](../FINE_TUNING_V4_TO_V7.md)
