@@ -1,0 +1,288 @@
+{
+  "method": "mase_lite_v6_phase25",
+  "framework": "pytorch",
+  "config": {
+    "num_classes": 12,
+    "dropout_rate": 0.5,
+    "patch_size": 8,
+    "selector_layers": 2,
+    "embed_dim": 64,
+    "num_heads": 4,
+    "mlp_dim": 128,
+    "top_k_patches": 40,
+    "mask_gfp_only": false,
+    "image_size": 64,
+    "soft_mask_alpha": 0.5,
+    "use_soft_probs": false,
+    "mcherry_guided": false,
+    "mcherry_threshold": -0.5,
+    "branch_dropout": 0.4,
+    "head_dropout": 0.5,
+    "learnable_ensemble": true,
+    "ensemble_temperature": 1.5,
+    "min_ensemble_weight": 0.2
+  },
+  "weight_health": {
+    "min_w": 0.2417459636926651,
+    "max_w": 0.26410990953445435,
+    "ok": true,
+    "rule": "ok if min_w>=0.1 and max_w<=0.4"
+  },
+  "tp_ahf": {
+    "phase": "v6_phase25",
+    "phase1_checkpoint_name": "mase_lite_full_v6_phase1",
+    "phase1_val_gate": 0.8875318878159231,
+    "phase2_ensemble_only": false,
+    "phase25_unfreeze_heads": true,
+    "phase25_head_lr": 2e-05,
+    "ensemble_lr_ratio": 0.25,
+    "ensemble_temp_start": 1.5,
+    "ensemble_temp_end": 1.0,
+    "max_ensemble_weight": 0.4,
+    "min_weight_health": 0.1
+  },
+  "optimizations": {
+    "recipe": "v6_phase25",
+    "epochs": 15,
+    "patience": 5,
+    "label_smoothing": 0.1,
+    "mask_sparsity_weight": 0.0,
+    "top_k": 40,
+    "strong_augment": true,
+    "learnable_ensemble": true,
+    "legacy_v2_loss": false,
+    "freeze_ensemble": false,
+    "v5": false,
+    "aux_head_weight": 0.0,
+    "distill_weight": 0.0,
+    "min_ensemble_weight": 0.2,
+    "ensemble_entropy_weight": 0.02,
+    "ensemble_lr": 0.00025,
+    "loss": "TP-AHF Phase2.5: fused_nll + ent(w) | min_w + heads+w fine-tune",
+    "branch_dropout": 0.4,
+    "head_dropout": 0.5,
+    "track_val_uauc": false,
+    "select_by": "acc",
+    "phase2_ensemble_only": false,
+    "v6_phase25": true,
+    "phase25_head_lr": 2e-05,
+    "ensemble_lr_ratio": 0.25,
+    "ensemble_temp_start": 1.5,
+    "ensemble_temp_end": 1.0,
+    "init": {
+      "resume": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v9\\deepyeast_full\\checkpoints\\mase_lite_full_v6_phase1\\best.pt"
+    },
+    "with_uq": false,
+    "uq_mc_samples": null
+  },
+  "params": 7025795,
+  "best_epoch": 2,
+  "best_val_accuracy": 0.8893016582849075,
+  "best_val_uauc_pe_det": NaN,
+  "best_select_score": 0.8893016582849075,
+  "test": {
+    "loss": 0.3981720795284729,
+    "accuracy": 0.8906568878767441,
+    "mask_coverage": 0.625,
+    "ensemble_weights": [
+      0.2417459636926651,
+      0.2453688681125641,
+      0.24877527356147766,
+      0.26410990953445435
+    ]
+  },
+  "elapsed_sec": 642.4720470905304,
+  "history": [
+    {
+      "epoch": 1,
+      "train": {
+        "loss": 0.6473080666633103,
+        "accuracy": 0.9573388287401575,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.24647124111652374,
+          0.2473863661289215,
+          0.24893030524253845,
+          0.2572121024131775
+        ]
+      },
+      "val": {
+        "loss": 0.3948873403881277,
+        "accuracy": 0.8886479592444946,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.24646629393100739,
+          0.24738453328609467,
+          0.2489313930273056,
+          0.2572178244590759
+        ]
+      },
+      "select_score": 0.8886479592444946,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 2,
+      "train": {
+        "loss": 0.6467608990749036,
+        "accuracy": 0.9574434055000778,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.24274054169654846,
+          0.24597829580307007,
+          0.2489956021308899,
+          0.2622855603694916
+        ]
+      },
+      "val": {
+        "loss": 0.393016231455365,
+        "accuracy": 0.8893016582849075,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.24273809790611267,
+          0.24597808718681335,
+          0.24899573624134064,
+          0.26228809356689453
+        ]
+      },
+      "select_score": 0.8893016582849075,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 3,
+      "train": {
+        "loss": 0.6473900159512918,
+        "accuracy": 0.9577294537636238,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.2400360405445099,
+          0.24542027711868286,
+          0.2496858686208725,
+          0.26485782861709595
+        ]
+      },
+      "val": {
+        "loss": 0.4009364762780618,
+        "accuracy": 0.886591199101234,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.24003452062606812,
+          0.24541963636875153,
+          0.24968498945236206,
+          0.2648608684539795
+        ]
+      },
+      "select_score": 0.886591199101234,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 4,
+      "train": {
+        "loss": 0.6455898720213747,
+        "accuracy": 0.9582523376218915,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.23797397315502167,
+          0.24578669667243958,
+          0.2510008215904236,
+          0.26523852348327637
+        ]
+      },
+      "val": {
+        "loss": 0.39687648522002356,
+        "accuracy": 0.8878667093053156,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.23797351121902466,
+          0.2457873821258545,
+          0.2510034441947937,
+          0.26523569226264954
+        ]
+      },
+      "select_score": 0.8878667093053156,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 5,
+      "train": {
+        "loss": 0.6452123733369384,
+        "accuracy": 0.957674089555196,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.23626433312892914,
+          0.24682959914207458,
+          0.25321564078330994,
+          0.26369041204452515
+        ]
+      },
+      "val": {
+        "loss": 0.3959645371960134,
+        "accuracy": 0.8883609695702183,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.2362644076347351,
+          0.2468293011188507,
+          0.25322139263153076,
+          0.2636848986148834
+        ]
+      },
+      "select_score": 0.8883609695702183,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 6,
+      "train": {
+        "loss": 0.644271837268758,
+        "accuracy": 0.9580585629803928,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.23484259843826294,
+          0.24821200966835022,
+          0.25615474581718445,
+          0.2607906460762024
+        ]
+      },
+      "val": {
+        "loss": 0.3991548536079271,
+        "accuracy": 0.8868144133261272,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.23483939468860626,
+          0.24821576476097107,
+          0.2561595141887665,
+          0.2607853412628174
+        ]
+      },
+      "select_score": 0.8868144133261272,
+      "lr": 0.00025
+    },
+    {
+      "epoch": 7,
+      "train": {
+        "loss": 0.6436483319702111,
+        "accuracy": 0.9582800196967726,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.2338339239358902,
+          0.2502783536911011,
+          0.25954684615135193,
+          0.256340891122818
+        ]
+      },
+      "val": {
+        "loss": 0.3969966750972125,
+        "accuracy": 0.8878507653669435,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.2338278591632843,
+          0.2502819001674652,
+          0.25955328345298767,
+          0.2563369870185852
+        ]
+      },
+      "select_score": 0.8878507653669435,
+      "lr": 0.00025
+    }
+  ],
+  "data_dir": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v9\\deepyeast_full",
+  "seed": 42
+}

@@ -1,0 +1,26 @@
+{
+  "method": "mase_lite_uq_mahalanobis_mi",
+  "checkpoint": "/Users/liuqiwu/Downloads/deepyeast_5pct/checkpoints/mase_lite_5pct_v4_default/best.pt",
+  "mc_samples": 20,
+  "pca_dim": 64,
+  "pca_explained": 0.9725853272148419,
+  "accuracy_test": 0.8571428571428571,
+  "scores": {
+    "pe_mc": 0.8748264108067163,
+    "one_minus_maxp": 0.8851786390607246,
+    "mc_mi": 0.8393300509194966,
+    "mahal_pred": 0.8838320077431301,
+    "mahal_min": 0.8549215166435216,
+    "mahal_pred_correctfit": 0.8921432479064091,
+    "z(pe)+z(mi)": 0.8730379160880359,
+    "z(pe)+z(mahal_pred)": 0.8958044018011193,
+    "z(1-maxp)+z(mahal_pred)": 0.9010646803854732,
+    "z(pe)+z(mi)+z(mahal)": 0.8942473593401506,
+    "logistic_pe_maxp_mi_mahal": 0.8984555822076337
+  },
+  "best": {
+    "name": "z(1-maxp)+z(mahal_pred)",
+    "AUROC": 0.9010646803854732
+  },
+  "delta_vs_pe_mc": 0.026238269578756857
+}

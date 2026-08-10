@@ -1,0 +1,89 @@
+{
+  "method": "mase_lite_feature_error_probe",
+  "checkpoint": "/Users/liuqiwu/Downloads/deepyeast_5pct/checkpoints/mase_lite_5pct_v4_default/best.pt",
+  "mc_samples": 20,
+  "pca_dim": 64,
+  "pca_explained": 0.9725853272148419,
+  "accuracy": {
+    "val": 0.8258785942492013,
+    "test": 0.8571428571428571
+  },
+  "baselines": {
+    "pe_mc": 0.8748264108067163,
+    "one_minus_maxp": 0.8851786390607246
+  },
+  "experiments": [
+    {
+      "name": "logistic_scalars",
+      "method": "logistic",
+      "l2": 0.01,
+      "val_AUROC": 0.8937057476975495,
+      "test_AUROC": 0.8824643353111981,
+      "delta_vs_pe_mc": 0.007637924504481752,
+      "delta_vs_1maxp": -0.0027143037495265254
+    },
+    {
+      "name": "logistic_pca64",
+      "method": "logistic",
+      "l2": 0.1,
+      "val_AUROC": 0.9050627295796143,
+      "test_AUROC": 0.7321886967133779,
+      "delta_vs_pe_mc": -0.14263771409333836,
+      "delta_vs_1maxp": -0.15298994234734664
+    },
+    {
+      "name": "logistic_pca64_scalars_l2=0.01",
+      "method": "logistic",
+      "l2": 0.01,
+      "val_AUROC": 0.9613685163167889,
+      "test_AUROC": 0.8290409460085005,
+      "delta_vs_pe_mc": -0.04578546479821577,
+      "delta_vs_1maxp": -0.05613769305222405
+    },
+    {
+      "name": "logistic_pca64_scalars_l2=0.1",
+      "method": "logistic",
+      "l2": 0.1,
+      "val_AUROC": 0.9496033928983373,
+      "test_AUROC": 0.8651054159828304,
+      "delta_vs_pe_mc": -0.009720994823885887,
+      "delta_vs_1maxp": -0.020073223077894164
+    },
+    {
+      "name": "logistic_pca64_scalars_l2=1",
+      "method": "logistic",
+      "l2": 1.0,
+      "val_AUROC": 0.9288591556793784,
+      "test_AUROC": 0.8820855952531246,
+      "delta_vs_pe_mc": 0.007259184446408273,
+      "delta_vs_1maxp": -0.0030930438076000044
+    },
+    {
+      "name": "mlp_pca64_scalars",
+      "method": "mlp",
+      "val_AUROC": 0.982432168651181,
+      "test_AUROC": 0.8422547658123974,
+      "delta_vs_pe_mc": -0.03257164499431886,
+      "delta_vs_1maxp": -0.04292387324832714
+    },
+    {
+      "name": "logistic_pca128_scalars_l2=0.1",
+      "method": "logistic",
+      "l2": 0.1,
+      "val_AUROC": 0.9730449133142867,
+      "test_AUROC": 0.8507132937760384,
+      "delta_vs_pe_mc": -0.024113117030677866,
+      "delta_vs_1maxp": -0.034465345284686144
+    }
+  ],
+  "best": {
+    "name": "logistic_scalars",
+    "method": "logistic",
+    "l2": 0.01,
+    "val_AUROC": 0.8937057476975495,
+    "test_AUROC": 0.8824643353111981,
+    "delta_vs_pe_mc": 0.007637924504481752,
+    "delta_vs_1maxp": -0.0027143037495265254
+  },
+  "note": "Classifier frozen. Probe predicts incorrectness from penultimate branch features (+ optional scalar UQ scores). Primary goal: higher AUROC."
+}

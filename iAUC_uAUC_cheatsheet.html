@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>uAUC (iAUC Eq.6) · Cheatsheet</title>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --ink: #1a1f24;
+      --muted: #5a6570;
+      --line: #d8dee6;
+      --bg: #f7f5f1;
+      --card: #ffffff;
+      --accent: #0d5c63;
+      --accent-soft: #e6f2f3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    h1 { font-size: 1.4rem; margin: 0 0 0.35rem; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.25rem; }
+    .meta a { color: var(--accent); }
+    .lang-banner {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 1.75rem 0 0.75rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 2px solid var(--accent);
+    }
+    .lang-banner:first-of-type { margin-top: 0.5rem; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: 1.05rem;
+      margin: 0 0 0.7rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.4rem;
+    }
+    p, li { font-size: 0.95rem; margin: 0.4rem 0; }
+    ul, ol { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .formula {
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      padding: 0.8rem 1rem;
+      margin: 0.75rem 0;
+      overflow-x: auto;
+    }
+    .formula .label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.3rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 0.5rem 0 0;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f0f3f6; }
+    button {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+      font: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+    code {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.88em;
+      background: #eef1f4;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    @media print { button { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>uAUC (iAUC · Eq.6)</h1>
+    <p class="meta">
+      Li &amp; Engelhard, arXiv:2602.04775 ·
+      <a href="https://arxiv.org/abs/2602.04775">abs</a> ·
+      <a href="https://arxiv.org/pdf/2602.04775">PDF</a>
+    </p>
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+
+    <!-- ===================== ENGLISH ===================== -->
+    <p class="lang-banner">English</p>
+
+    <section>
+      <h2>Meaning</h2>
+      <p>
+        The conditional probability of a correct ranking on positive–negative pairs
+        whose prediction intervals <strong>do not overlap</strong> (decisive pairs).
+        Overlapping pairs are abstained and excluded from the denominator.
+      </p>
+    </section>
+
+    <section>
+      <h2>Formulas</h2>
+      <div class="formula">
+        <div class="label">Interval comparison</div>
+        \[
+          I_1 > I_0 \iff L_1 > U_0,\qquad
+          I_1 < I_0 \iff U_1 < L_0
+        \]
+        (otherwise: overlap)
+      </div>
+      <div class="formula">
+        <div class="label">uAUC · Eq.(6)</div>
+        \[
+          uAUC
+          :=
+          \frac{\mathbb{P}(I_1 > I_0)}
+               {\mathbb{P}(I_1 > I_0)+\mathbb{P}(I_1 < I_0)}
+        \]
+      </div>
+    </section>
+
+    <section>
+      <h2>How to compute</h2>
+      <ol>
+        <li>Obtain an interval \(I(x)=(L,U)\) for each sample.</li>
+        <li>Enumerate positive × negative pairs.</li>
+        <li>Count:
+          <ul>
+            <li><code>n_correct</code>: \(L_+ > U_-\)</li>
+            <li><code>n_incorrect</code>: \(U_+ &lt; L_-\)</li>
+            <li>otherwise: overlap (abstain)</li>
+          </ul>
+        </li>
+        <li>
+          \[
+            \widehat{uAUC}
+            =
+            \frac{n_{\mathrm{correct}}}
+                 {n_{\mathrm{correct}}+n_{\mathrm{incorrect}}}
+          \]
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Example from the paper (§5, Experiment 3)</h2>
+      <p>
+        Dataset: Pima Indians Diabetes.
+        Intervals: bootstrap-based prediction intervals.
+        Point-score baseline AUC ≈ <strong>0.8306</strong>.
+      </p>
+      <ul>
+        <li>
+          At a <strong>90%</strong> confidence level, the model abstains on
+          <strong>33.7%</strong> of pairs
+          (\(\mathrm{AR}=\mathbb{P}(\mathrm{overlap})=0.337\)),
+          but achieves <strong>uAUC = 0.916</strong> on the remaining decisive pairs
+          — higher than the point-AUC 0.8306.
+        </li>
+        <li>
+          As the confidence level rises from 50% to 99%, the abstention rate increases
+          while <strong>uAUC</strong> stays in about <strong>0.83–0.94</strong> and
+          increases monotonically (Figure 4 in the paper).
+        </li>
+      </ul>
+      <p>
+        Interpretation: wider intervals mainly turn previously decisive comparisons into
+        overlaps (abstention), rather than creating many high-confidence ranking errors,
+        so the retained rankings become more reliable.
+      </p>
+    </section>
+
+    <section>
+      <h2>Comparison</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Source</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>uAUC</strong> (this paper)</td>
+            <td>iAUC · Eq.(6)</td>
+            <td>Conditional ranking accuracy on non-overlapping pairs</td>
+          </tr>
+          <tr>
+            <td><strong>UAUC-ROC</strong></td>
+            <td>Dibeco et al. 2024 Frontiers</td>
+            <td>Methods only define AUC-ROC; the table adds a “U” → ≈ ordinary classification AUC-ROC</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== CHINESE ===================== -->
+    <p class="lang-banner">中文</p>
+
+    <section>
+      <h2>含义</h2>
+      <p>
+        在预测区间<strong>不重叠</strong>、因而可以明确排序的正负样本对上，
+        排序正确的<strong>条件概率</strong>。重叠的对弃权，不进入分母。
+      </p>
+    </section>
+
+    <section>
+      <h2>公式</h2>
+      <div class="formula">
+        <div class="label">区间比较</div>
+        \[
+          I_1 > I_0 \iff L_1 > U_0,\qquad
+          I_1 < I_0 \iff U_1 < L_0
+        \]
+        （否则为 overlap）
+      </div>
+      <div class="formula">
+        <div class="label">uAUC · Eq.(6)</div>
+        \[
+          uAUC
+          :=
+          \frac{\mathbb{P}(I_1 > I_0)}
+               {\mathbb{P}(I_1 > I_0)+\mathbb{P}(I_1 < I_0)}
+        \]
+      </div>
+    </section>
+
+    <section>
+      <h2>计算方法</h2>
+      <ol>
+        <li>每个样本得到区间 \(I(x)=(L,U)\)</li>
+        <li>枚举正类 × 负类样本对</li>
+        <li>计数：
+          <ul>
+            <li><code>n_correct</code>：\(L_+ > U_-\)</li>
+            <li><code>n_incorrect</code>：\(U_+ &lt; L_-\)</li>
+            <li>其余为 overlap（弃权）</li>
+          </ul>
+        </li>
+        <li>
+          \[
+            \widehat{uAUC}
+            =
+            \frac{n_{\mathrm{correct}}}
+                 {n_{\mathrm{correct}}+n_{\mathrm{incorrect}}}
+          \]
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>论文中的例子（§5，Experiment 3）</h2>
+      <p>
+        数据：Pima Indians Diabetes。
+        区间：bootstrap 预测区间。
+        点估计基线 AUC ≈ <strong>0.8306</strong>。
+      </p>
+      <ul>
+        <li>
+          在 <strong>90%</strong> 置信水平下，约 <strong>33.7%</strong> 的样本对被弃权
+          （\(\mathrm{AR}=\mathbb{P}(\mathrm{overlap})=0.337\)），
+          其余可决对上 <strong>uAUC = 0.916</strong>，
+          高于点估计 AUC 0.8306。
+        </li>
+        <li>
+          置信水平从 50% 升到 99% 时，弃权率上升，
+          而 <strong>uAUC</strong> 约在 <strong>0.83–0.94</strong>，
+          且单调上升（原文 Figure 4）。
+        </li>
+      </ul>
+      <p>
+        解释：加宽区间主要把原本可决的比较变成 overlap（弃权），
+        而不是制造大量“自信排反”，因此留下的排序更可靠。
+      </p>
+    </section>
+
+    <section>
+      <h2>对比</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>出处</th>
+            <th>含义</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>uAUC</strong>（本文）</td>
+            <td>iAUC · Eq.(6)</td>
+            <td>区间不重叠对上的条件排序正确率</td>
+          </tr>
+          <tr>
+            <td><strong>UAUC-ROC</strong></td>
+            <td>Dibeco et al. 2024 Frontiers</td>
+            <td>方法只定义了 AUC-ROC；表头多写 U → ≈ 普通分类 AUC-ROC</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</body>
+</html>

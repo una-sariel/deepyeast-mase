@@ -1,0 +1,122 @@
+{
+  "checkpoint": "C:\\Users\\unaliuqw\\deepyeast_10pct\\checkpoints\\mase_lite_10pct_confident\\best.pt",
+  "data_dir": "C:\\Users\\unaliuqw\\deepyeast_10pct",
+  "mc_samples": 30,
+  "note": "Temperature applied as log_p/T then renormalize. Deterministic Acc is invariant to T; MC Acc may shift slightly. Lower T \u2192 lower PE / higher max_prob.",
+  "splits": {
+    "val": [
+      {
+        "temperature": 1.0,
+        "n": 1250.0,
+        "det_acc": 0.8232,
+        "det_pe_mean": 0.371817022562027,
+        "det_max_prob_mean": 0.8742532134056091,
+        "mc_acc": 0.8208,
+        "mc_pe_mean": 0.3926246464252472,
+        "mc_max_prob_mean": 0.8680161833763123,
+        "mc_UAUC": 0.8994621971595655
+      },
+      {
+        "temperature": 0.9,
+        "n": 1250.0,
+        "det_acc": 0.8232,
+        "det_pe_mean": 0.3228132128715515,
+        "det_max_prob_mean": 0.8885619044303894,
+        "mc_acc": 0.8248,
+        "mc_pe_mean": 0.34316322207450867,
+        "mc_max_prob_mean": 0.8823837637901306,
+        "mc_UAUC": 0.8930815938774697
+      },
+      {
+        "temperature": 0.8,
+        "n": 1250.0,
+        "det_acc": 0.8232,
+        "det_pe_mean": 0.2767326831817627,
+        "det_max_prob_mean": 0.9024147391319275,
+        "mc_acc": 0.8232,
+        "mc_pe_mean": 0.2970585227012634,
+        "mc_max_prob_mean": 0.8957418203353882,
+        "mc_UAUC": 0.8951272816819034
+      },
+      {
+        "temperature": 0.7,
+        "n": 1250.0,
+        "det_acc": 0.8232,
+        "det_pe_mean": 0.23347017168998718,
+        "det_max_prob_mean": 0.9158294796943665,
+        "mc_acc": 0.8232,
+        "mc_pe_mean": 0.2533508241176605,
+        "mc_max_prob_mean": 0.9089553952217102,
+        "mc_UAUC": 0.8925987977608625
+      },
+      {
+        "temperature": 0.5,
+        "n": 1250.0,
+        "det_acc": 0.8232,
+        "det_pe_mean": 0.1549614518880844,
+        "det_max_prob_mean": 0.9413886666297913,
+        "mc_acc": 0.8248,
+        "mc_pe_mean": 0.17485873401165009,
+        "mc_max_prob_mean": 0.9340967535972595,
+        "mc_UAUC": 0.88521141419644
+      }
+    ],
+    "test": [
+      {
+        "temperature": 1.0,
+        "n": 1250.0,
+        "det_acc": 0.8512,
+        "det_pe_mean": 0.36856159567832947,
+        "det_max_prob_mean": 0.8732506632804871,
+        "mc_acc": 0.8512,
+        "mc_pe_mean": 0.38836485147476196,
+        "mc_max_prob_mean": 0.8673029541969299,
+        "mc_UAUC": 0.8792596410380792
+      },
+      {
+        "temperature": 0.9,
+        "n": 1250.0,
+        "det_acc": 0.8512,
+        "det_pe_mean": 0.3236970603466034,
+        "det_max_prob_mean": 0.8866081833839417,
+        "mc_acc": 0.8496,
+        "mc_pe_mean": 0.34247392416000366,
+        "mc_max_prob_mean": 0.8805137872695923,
+        "mc_UAUC": 0.8807098208919342
+      },
+      {
+        "temperature": 0.8,
+        "n": 1250.0,
+        "det_acc": 0.8512,
+        "det_pe_mean": 0.2814270853996277,
+        "det_max_prob_mean": 0.899742603302002,
+        "mc_acc": 0.8496,
+        "mc_pe_mean": 0.30087435245513916,
+        "mc_max_prob_mean": 0.8927738070487976,
+        "mc_UAUC": 0.880223985254638
+      },
+      {
+        "temperature": 0.7,
+        "n": 1250.0,
+        "det_acc": 0.8512,
+        "det_pe_mean": 0.24128760397434235,
+        "det_max_prob_mean": 0.9127760529518127,
+        "mc_acc": 0.8512,
+        "mc_pe_mean": 0.2595193386077881,
+        "mc_max_prob_mean": 0.9058383703231812,
+        "mc_UAUC": 0.8784966448379012
+      },
+      {
+        "temperature": 0.5,
+        "n": 1250.0,
+        "det_acc": 0.8512,
+        "det_pe_mean": 0.16513125598430634,
+        "det_max_prob_mean": 0.9389819502830505,
+        "mc_acc": 0.8512,
+        "mc_pe_mean": 0.18612296879291534,
+        "mc_max_prob_mean": 0.930648922920227,
+        "mc_UAUC": 0.877556795213841
+      }
+    ]
+  }
+}

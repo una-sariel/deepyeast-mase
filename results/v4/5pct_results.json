@@ -1,0 +1,71 @@
+{
+  "method": "mase_lite_v4",
+  "framework": "pytorch",
+  "config": {
+    "num_classes": 12,
+    "dropout_rate": 0.5,
+    "patch_size": 8,
+    "selector_layers": 2,
+    "embed_dim": 64,
+    "num_heads": 4,
+    "mlp_dim": 128,
+    "top_k_patches": 40,
+    "mask_gfp_only": false,
+    "image_size": 64,
+    "soft_mask_alpha": 0.5,
+    "use_soft_probs": false,
+    "mcherry_guided": false,
+    "mcherry_threshold": -0.5,
+    "branch_dropout": 0.4,
+    "head_dropout": 0.5,
+    "learnable_ensemble": false,
+    "ensemble_temperature": 1.0,
+    "min_ensemble_weight": 0.0
+  },
+  "optimizations": {
+    "recipe": "v4",
+    "epochs": 60,
+    "patience": 15,
+    "label_smoothing": 0.1,
+    "mask_sparsity_weight": 0.05,
+    "top_k": 40,
+    "strong_augment": true,
+    "learnable_ensemble": false,
+    "legacy_v2_loss": false,
+    "aux_head_weight": 0.5,
+    "distill_weight": 0.1,
+    "min_ensemble_weight": 0.0,
+    "ensemble_entropy_weight": 0.0,
+    "ensemble_lr": 0.005,
+    "loss": "fused_nll + aux + kl | frozen uniform w=0.25",
+    "branch_dropout": 0.4,
+    "head_dropout": 0.5,
+    "init": {
+      "plcnn": {
+        "path": "/Users/liuqiwu/Downloads/deepyeast-mase/artifacts/checkpoints_5pct/plcnn_triple/best.pt",
+        "n_tensors": 306
+      },
+      "selector": {
+        "path": "/Users/liuqiwu/Downloads/deepyeast-mase/artifacts/checkpoints_5pct/masked_v3k60_pytorch/best.pt",
+        "n_tensors": 29
+      }
+    }
+  },
+  "params": 7025791,
+  "best_epoch": 57,
+  "best_val_accuracy": 0.8269375026226043,
+  "test": {
+    "loss": 0.9364760935306549,
+    "accuracy": 0.8586768627166748,
+    "mask_coverage": 0.625,
+    "ensemble_weights": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ]
+  },
+  "elapsed_sec": 11694.435057163239,
+  "data_dir": "/Users/liuqiwu/Downloads/deepyeast_5pct",
+  "seed": 42
+}

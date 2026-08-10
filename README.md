@@ -4,19 +4,27 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
+JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` … `results/v7`).
+
 ### Full data (seed=42, 5% init)
 
-| Method | Test | Notes |
-|--------|------|-------|
+| Method | Test | Notes / source |
+|--------|------|----------------|
 | Keras baseline | 88.4% | official |
 | MaSE Lite v2 | 89.1% | uniform; head-mean CE |
 | MaSE Lite v3 | 87.75% | learnable; **collapsed** |
-| **MaSE Lite v4** | **≈89.58%** | fused-CE + **frozen** uniform — current accuracy SOTA |
-| MaSE Lite v5 | TBD | learnable + anti-collapse + PE→AUROC |
+| MaSE Lite v4 | ≈89.58% | fused-CE + frozen uniform |
+| v6 Phase 1 | 88.95% | `results/v6/phase1_results.json` |
+| v6 Phase 2.5 | 89.07% | `results/v6/phase25_results.json` |
+| **v6 Phase 2.5 + TTA** | **89.82%** | `results/v6/phase25_tta_summary.json` |
+| v7 | 89.06% | `results/v7/results.json` |
+| **v7 + TTA** | **89.82%** | `results/v7/tta_summary.json` |
+
+Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp).
 
 ### 5% pilot (seed=42)
 
@@ -27,7 +35,7 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 | MaSE-Net Lite v3 (learnable) | — | 86.1% |
 | MaSE-Net Lite v4 (frozen) | 82.7% | **85.9%** |
 
-**Accuracy default:** Lite **v4**. **Learnable fusion:** **v6 TP-AHF** ([V6_RUN.md](V6_RUN.md)). **v5** (`--v5`) = single-phase learnable + PE→AUROC.
+**Run docs:** v6 [V6_RUN.md](V6_RUN.md) / [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md); v7 [V7_RUN.md](V7_RUN.md).
 
 ## Download DeepYeast data
 

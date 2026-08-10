@@ -1,0 +1,586 @@
+{
+  "method": "mase_lite_v2",
+  "framework": "pytorch",
+  "config": {
+    "num_classes": 12,
+    "dropout_rate": 0.5,
+    "patch_size": 8,
+    "selector_layers": 2,
+    "embed_dim": 64,
+    "num_heads": 4,
+    "mlp_dim": 128,
+    "top_k_patches": 40,
+    "mask_gfp_only": false,
+    "image_size": 64,
+    "soft_mask_alpha": 0.5,
+    "use_soft_probs": false,
+    "mcherry_guided": false,
+    "mcherry_threshold": -0.5,
+    "branch_dropout": 0.25,
+    "head_dropout": 0.3,
+    "learnable_ensemble": true,
+    "ensemble_temperature": 1.0,
+    "min_ensemble_weight": 0.0
+  },
+  "optimizations": {
+    "recipe": "v2",
+    "epochs": 20,
+    "patience": 8,
+    "label_smoothing": 0.0,
+    "mask_sparsity_weight": 0.05,
+    "top_k": 40,
+    "strong_augment": true,
+    "learnable_ensemble": true,
+    "legacy_v2_loss": true,
+    "aux_head_weight": 0.5,
+    "distill_weight": 0.1,
+    "min_ensemble_weight": 0.0,
+    "ensemble_entropy_weight": 0.0,
+    "ensemble_lr": null,
+    "loss": "mean_head_ce + sparsity",
+    "branch_dropout": 0.25,
+    "head_dropout": 0.3,
+    "init": {
+      "resume": "C:\\Users\\unaliuqw\\deepyeast_10pct\\checkpoints\\triple_fusion_lite_10pct_v2\\best.pt"
+    }
+  },
+  "params": 7025795,
+  "best_epoch": 15,
+  "best_val_accuracy": 0.8218290448188782,
+  "test": {
+    "loss": 0.6288351282477379,
+    "accuracy": 0.8512408077716828,
+    "mask_coverage": 0.625,
+    "ensemble_weights": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ]
+  },
+  "elapsed_sec": 26301.15869498253,
+  "history": [
+    {
+      "epoch": 1,
+      "train": {
+        "loss": 0.30839089479516535,
+        "accuracy": 0.9195942265145919,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.7130474671721458,
+        "accuracy": 0.8015165448188781,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 2,
+      "train": {
+        "loss": 0.29848383410888557,
+        "accuracy": 0.9220962688034656,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6994328841567039,
+        "accuracy": 0.8086397051811218,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 3,
+      "train": {
+        "loss": 0.28586751200697,
+        "accuracy": 0.9250068080191519,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6820731580257415,
+        "accuracy": 0.8157628685235977,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 4,
+      "train": {
+        "loss": 0.29461253931125003,
+        "accuracy": 0.918794253877565,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6874134242534637,
+        "accuracy": 0.7982996314764023,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 5,
+      "train": {
+        "loss": 0.2712395078703469,
+        "accuracy": 0.9276109746858185,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.719355933368206,
+        "accuracy": 0.8062040448188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 6,
+      "train": {
+        "loss": 0.2699384521327767,
+        "accuracy": 0.9262322982152303,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.7040104508399964,
+        "accuracy": 0.8047334551811218,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 7,
+      "train": {
+        "loss": 0.2919373013371346,
+        "accuracy": 0.9176538668426812,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.8571352332830429,
+        "accuracy": 0.7719209551811218,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 8,
+      "train": {
+        "loss": 0.2661755467746772,
+        "accuracy": 0.9298236656422708,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.662722934782505,
+        "accuracy": 0.8209558814764023,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 9,
+      "train": {
+        "loss": 0.27284185632186775,
+        "accuracy": 0.9303342863625171,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6945260718464852,
+        "accuracy": 0.8101102948188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 10,
+      "train": {
+        "loss": 0.2741391661704755,
+        "accuracy": 0.9257727393917009,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6891793429851532,
+        "accuracy": 0.8164522051811218,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 11,
+      "train": {
+        "loss": 0.2541576740058029,
+        "accuracy": 0.9297555825289558,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.668968902528286,
+        "accuracy": 0.8062040448188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 12,
+      "train": {
+        "loss": 0.2447457664153155,
+        "accuracy": 0.9353383715246238,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.7438940286636353,
+        "accuracy": 0.8101102948188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 13,
+      "train": {
+        "loss": 0.2537797615297285,
+        "accuracy": 0.9269641883233014,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.7067305535078049,
+        "accuracy": 0.8068933814764023,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.0003
+    },
+    {
+      "epoch": 14,
+      "train": {
+        "loss": 0.25457296242900923,
+        "accuracy": 0.9290917755341997,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6878271251916885,
+        "accuracy": 0.8147977948188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 15,
+      "train": {
+        "loss": 0.21331002475584254,
+        "accuracy": 0.9458401413524852,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6796621978282928,
+        "accuracy": 0.8218290448188782,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 16,
+      "train": {
+        "loss": 0.20759376518282235,
+        "accuracy": 0.946759258999544,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6768246576189995,
+        "accuracy": 0.8131433814764023,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 17,
+      "train": {
+        "loss": 0.19841250967161328,
+        "accuracy": 0.9469975490196079,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6911146298050881,
+        "accuracy": 0.8087316185235978,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 18,
+      "train": {
+        "loss": 0.1896384405154808,
+        "accuracy": 0.9501633988875969,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6629291728138924,
+        "accuracy": 0.8203584551811218,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 19,
+      "train": {
+        "loss": 0.19245029182410708,
+        "accuracy": 0.949942129499772,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6634922191500664,
+        "accuracy": 0.8201746314764022,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    },
+    {
+      "epoch": 20,
+      "train": {
+        "loss": 0.19565701397026286,
+        "accuracy": 0.9495846950540355,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "val": {
+        "loss": 0.6941707983613015,
+        "accuracy": 0.8193933814764023,
+        "mask_coverage": 0.625,
+        "ensemble_weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ]
+      },
+      "lr": 0.00015
+    }
+  ],
+  "data_dir": "C:\\Users\\unaliuqw\\deepyeast_10pct",
+  "seed": 42
+}
