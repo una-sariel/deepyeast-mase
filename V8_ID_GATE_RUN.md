@@ -128,3 +128,39 @@ Test:     0.89xx
 | With TTA | compare to Phase 2.5 + TTA **89.82%** |
 
 Report **train** and **TTA** as separate rows.
+
+---
+
+## What “ID-Gate” means (plain language)
+
+**ID-Gate** = **I**nput-**D**ependent gate. It is a **project nickname**, not a published method name. The underlying idea is soft **Mixture-of-Experts** gating (Jacobs et al., 1991): a small network looks at the current image’s features and decides how much to trust each of the four progressive heads.
+
+### Before v8 (Phase 2.5 / v7)
+
+- Fusion uses **one global weight vector** `w = [w_V, w_R, w_D, w_F]` shared by **every** image.
+- Those four numbers are learned once (or frozen) and do not change with the input.
+
+### After v8 (ID-Gate)
+
+- Fusion uses **per-image** weights `w(x)`.
+- A small MLP (`id_gate`) reads branch features  
+  \(x = \mathrm{concat}(v, r, d)\)  
+  (VGG / ResNet / DenseNet branch embeddings) and outputs 4 logits → Softmax → `w(x)`.
+- Final prediction: mix the four head probability vectors with `w(x)` (dense soft gating — all heads stay active; not sparse Top‑k MoE).
+
+| | Global fusion | **ID-Gate** |
+|--|---------------|-------------|
+| Weights | same `w` for all images | different `w(x)` per image |
+| Who decides | fixed / learned scalars | MLP conditioned on this image’s `v,r,d` |
+| Intuition | “always blend heads the same way” | “route this image to the heads that fit it” |
+
+### Why fine-tune this way
+
+- Start from a strong Phase‑1 checkpoint (selector + PLCNN branches already trained).
+- **Freeze** selector + branches; **train** only `id_gate` + the four heads (plus min-weight / entropy regularizers so one head does not collapse).
+- Gate last layer is **zero-init**, so early `w(x)` is near uniform, then learns sample-wise routing.
+
+### One-line takeaway
+
+> **ID-Gate = learn an input-dependent soft mix of the four MaSE heads, instead of one global mix for the whole dataset.**
+
