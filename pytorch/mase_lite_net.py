@@ -86,7 +86,8 @@ class MaSELiteNet(nn.Module):
       self.register_buffer("ensemble_logits", torch.zeros(4), persistent=False)
     self.ensemble_temperature = max(float(cfg.ensemble_temperature), 1e-3)
 
-    # Input-dependent gate: concat(v,r,d) → 4 head logits (zero-init → uniform)
+    # Input-dependent gate (soft MoE-style; Jacobs et al. 1991):
+    # concat(v,r,d) → 4 head logits (zero-init → uniform). See V8_ID_GATE_RUN.md.
     self.id_gate: nn.Sequential | None = None
     if cfg.id_gate:
       hidden = max(int(cfg.id_gate_hidden), 16)
