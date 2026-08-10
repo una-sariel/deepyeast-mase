@@ -36,6 +36,8 @@ class MaSELiteConfig(MaskedModelConfig):
   learnable_ensemble: bool = True
   ensemble_temperature: float = 1.0
   min_ensemble_weight: float = 0.0
+  id_gate: bool = False
+  id_gate_hidden: int = 128
 
 
 MASE_LITE_DEFAULT = MaSELiteConfig(
@@ -47,6 +49,8 @@ MASE_LITE_DEFAULT = MaSELiteConfig(
   learnable_ensemble=True,
   ensemble_temperature=1.0,
   min_ensemble_weight=0.0,
+  id_gate=False,
+  id_gate_hidden=128,
 )
 
 
@@ -82,6 +86,19 @@ class MaSELiteNet(nn.Module):
       self.register_buffer("ensemble_logits", torch.zeros(4), persistent=False)
     self.ensemble_temperature = max(float(cfg.ensemble_temperature), 1e-3)
 
+    # Input-dependent gate: concat(v,r,d) → 4 head logits (zero-init → uniform)
+    self.id_gate: nn.Sequential | None = None
+    if cfg.id_gate:
+      hidden = max(int(cfg.id_gate_hidden), 16)
+      self.id_gate = nn.Sequential(
+        nn.Linear(BRANCH_DIM * 3, hidden),
+        nn.ReLU(inplace=True),
+        nn.Dropout(cfg.head_dropout),
+        nn.Linear(hidden, 4),
+      )
+      nn.init.zeros_(self.id_gate[-1].weight)
+      nn.init.zeros_(self.id_gate[-1].bias)
+
   def _mask_input(
     self, x: torch.Tensor, train: bool
   ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -99,15 +116,29 @@ class MaSELiteNet(nn.Module):
     )
     return masked_x, mask, patch_probs
 
-  def mixture_weights(self) -> torch.Tensor:
-    """Softmax ensemble weights with optional floor (anti-collapse)."""
-    weights = F.softmax(self.ensemble_logits / self.ensemble_temperature, dim=0)
+  def _apply_weight_floor(self, weights: torch.Tensor) -> torch.Tensor:
+    """Floor each mixture weight then renormalize. Supports (4,) or (B, 4)."""
     eps = float(self.config.min_ensemble_weight)
-    if eps > 0.0:
-      n = weights.numel()
-      eps = min(eps, (1.0 / n) - 1e-4)
-      weights = weights * (1.0 - n * eps) + eps
-    return weights
+    if eps <= 0.0:
+      return weights
+    n = weights.shape[-1]
+    eps = min(eps, (1.0 / n) - 1e-4)
+    return weights * (1.0 - n * eps) + eps
+
+  def mixture_weights(
+    self, gate_feats: torch.Tensor | None = None
+  ) -> torch.Tensor:
+    """Softmax ensemble weights with optional floor (anti-collapse).
+
+    Global mode: returns (4,).
+    ID-Gate mode (gate_feats = concat(v,r,d)): returns (B, 4).
+    """
+    if self.id_gate is not None and gate_feats is not None:
+      logits = self.id_gate(gate_feats) / self.ensemble_temperature
+      weights = F.softmax(logits, dim=-1)
+    else:
+      weights = F.softmax(self.ensemble_logits / self.ensemble_temperature, dim=0)
+    return self._apply_weight_floor(weights)
 
   def _ensemble_probs(self, branch_logits: list[torch.Tensor]) -> torch.Tensor:
     stacked = torch.stack(
@@ -134,11 +165,19 @@ class MaSELiteNet(nn.Module):
       torch.cat([v, r, d], dim=1),
     ]
     branch_logits = [head(feat) for head, feat in zip(self.heads, feats)]
-    weights = self.mixture_weights()
+    gate_in = torch.cat([v, r, d], dim=1)
+    weights = self.mixture_weights(
+      gate_in if self.id_gate is not None else None
+    )
     stacked = torch.stack(
       [F.softmax(logits, dim=-1) for logits in branch_logits], dim=1
     )
-    probs = (stacked * weights.view(1, 4, 1)).sum(dim=1)
+    if weights.dim() == 1:
+      probs = (stacked * weights.view(1, 4, 1)).sum(dim=1)
+      weights_log = weights.detach()
+    else:
+      probs = (stacked * weights.unsqueeze(-1)).sum(dim=1)
+      weights_log = weights.detach().mean(dim=0)
     ensemble = torch.log(probs.clamp_min(1e-8))
 
     if return_details:
@@ -149,7 +188,7 @@ class MaSELiteNet(nn.Module):
         "branch_feats": (v, r, d),
         "ensemble_log_probs": ensemble,
         "ensemble_weights_live": weights,
-        "ensemble_weights": weights.detach(),
+        "ensemble_weights": weights_log,
       }
     return ensemble
 
@@ -253,8 +292,12 @@ def mase_lite_loss(
     weights = details.get("ensemble_weights_live")
     if weights is None:
       raise KeyError("details must include ensemble_weights_live for entropy reg")
-    # maximize H(w) ≡ minimize -H(w)
-    entropy = -(weights * weights.clamp_min(1e-8).log()).sum()
+    # maximize H(w) ≡ minimize -H(w); supports global (4,) or ID-Gate (B, 4)
+    log_w = weights.clamp_min(1e-8).log()
+    if weights.dim() == 1:
+      entropy = -(weights * log_w).sum()
+    else:
+      entropy = -(weights * log_w).sum(dim=-1).mean()
     loss = loss - ensemble_entropy_weight * entropy
 
   if mask_sparsity_weight > 0.0:

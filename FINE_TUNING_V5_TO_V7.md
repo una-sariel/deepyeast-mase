@@ -161,12 +161,14 @@ Script: `pytorch/eval_mase_tta.py`
 
 ---
 
-## Next options (if still targeting 90%)
+## Next: v8 ID-Gate (single-model fine-tune)
 
-1. **3-seed ensemble** (seed 42/43/44 Phase-1 or v4-style) ± TTA  
-2. **ID-Gate** — sample-dependent `w(x)` (model-side; paper innovation)  
-3. Do **not** expect another Phase2.5 LR grid to cross 90% alone  
+Sample-wise fusion `w(x)` via a small MLP on `concat(v,r,d)`.  
+Resume Phase-1; train **id_gate + heads**; freeze selector/branches.
 
+See [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) (`--v8`).
+
+Do **not** expect another Phase2.5 / v7 LR grid alone to cross 90%.  
 Report train and TTA as **separate rows** in any paper table.
 
 ---

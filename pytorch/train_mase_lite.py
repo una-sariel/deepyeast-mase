@@ -205,6 +205,22 @@ def set_phase25_ensemble_and_heads(model: MaSELiteNet) -> tuple[int, int]:
   return n_ens, n_head
 
 
+def set_v8_id_gate_and_heads(model: MaSELiteNet) -> tuple[int, int]:
+  """Freeze selector + branches; train id_gate + progressive heads."""
+  n_gate = 0
+  n_head = 0
+  for name, param in model.named_parameters():
+    if name.startswith("id_gate.") or name.startswith("heads."):
+      param.requires_grad = True
+      if name.startswith("id_gate."):
+        n_gate += param.numel()
+      else:
+        n_head += param.numel()
+    else:
+      param.requires_grad = False
+  return n_gate, n_head
+
+
 def resolve_default_init(name: str) -> Path | None:
   candidates = [
     _REPO_ROOT / "artifacts" / "checkpoints_5pct" / name / "best.pt",
@@ -384,6 +400,15 @@ def main() -> None:
     ),
   )
   parser.add_argument(
+    "--v8",
+    action="store_true",
+    help=(
+      "MaSE Lite v8 ID-Gate: resume Phase-1; train sample-wise fusion gate "
+      "+ heads (selector/branches frozen). "
+      "Default checkpoint: mase_lite_full_v8"
+    ),
+  )
+  parser.add_argument(
     "--with-tta",
     action="store_true",
     help="After test: TTA eval on best.pt → tta_eval/summary.json",
@@ -392,7 +417,19 @@ def main() -> None:
     "--phase25-head-lr",
     type=float,
     default=None,
-    help="LR for progressive heads in --v6-phase25 (default: 2e-5)",
+    help="LR for progressive heads in --v6-phase25 / --v8 (default: 2e-5)",
+  )
+  parser.add_argument(
+    "--id-gate-lr",
+    type=float,
+    default=None,
+    help="LR for ID-Gate MLP in --v8 (default: 1e-3)",
+  )
+  parser.add_argument(
+    "--id-gate-hidden",
+    type=int,
+    default=128,
+    help="Hidden size of ID-Gate MLP (default: 128)",
   )
   parser.add_argument(
     "--phase2-ensemble-only",
@@ -448,23 +485,32 @@ def main() -> None:
     args.no_init = True
 
   if args.v7:
-    if args.v6_phase1 or args.v6_phase2 or args.v6_phase25:
-      raise SystemExit("--v7 cannot combine with --v6-phase1/2/25")
+    if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v8:
+      raise SystemExit("--v7 cannot combine with --v6-phase1/2/25 or --v8")
     args.v6_phase25 = True
 
-  tp_phase_flags = [args.v6_phase1, args.v6_phase2, args.v6_phase25]
-  if sum(tp_phase_flags) > 1:
+  tp_phase_flags = [
+    args.v6_phase1,
+    args.v6_phase2,
+    args.v6_phase25,
+    args.v8,
+  ]
+  if sum(bool(x) for x in tp_phase_flags) > 1:
     raise SystemExit(
-      "Use only one of --v6-phase1, --v6-phase2, --v6-phase25 per run"
+      "Use only one of --v6-phase1, --v6-phase2, --v6-phase25, --v8 per run"
     )
   if args.v6_phase2 and args.freeze_ensemble:
     raise SystemExit("--v6-phase2 conflicts with --freeze-ensemble")
   if args.v6_phase25 and args.freeze_ensemble:
     raise SystemExit("--v6-phase25 conflicts with --freeze-ensemble")
+  if args.v8 and args.freeze_ensemble:
+    raise SystemExit("--v8 conflicts with --freeze-ensemble")
   if args.v6_phase2 and args.legacy_v2_loss:
     raise SystemExit("--v6-phase2 requires fused-CE (do not use --legacy-v2-loss)")
   if args.v6_phase25 and args.legacy_v2_loss:
     raise SystemExit("--v6-phase25 requires fused-CE (do not use --legacy-v2-loss)")
+  if args.v8 and args.legacy_v2_loss:
+    raise SystemExit("--v8 requires fused-CE (do not use --legacy-v2-loss)")
 
   if args.v6_phase1:
     args.freeze_ensemble = True
@@ -566,6 +612,52 @@ def main() -> None:
     if args.patience == 5 and "--patience" not in sys.argv:
       args.patience = 3
 
+  if args.v8:
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v8"
+    if args.epochs == 60:
+      args.epochs = 15
+    if args.patience == 15:
+      args.patience = 5
+    if args.min_ensemble_weight == 0.05:
+      args.min_ensemble_weight = 0.15
+    if args.ensemble_entropy_weight == 0.0:
+      args.ensemble_entropy_weight = 0.02
+    if args.aux_head_weight == 0.5:
+      args.aux_head_weight = 0.0
+    if args.distill_weight == 0.1:
+      args.distill_weight = 0.0
+    if args.mask_sparsity_weight == 0.05:
+      args.mask_sparsity_weight = 0.0
+    if args.ensemble_temp_start is None:
+      args.ensemble_temp_start = 1.5
+    if args.ensemble_temp_end is None:
+      args.ensemble_temp_end = 1.0
+    if args.ensemble_temperature == 1.0 and args.ensemble_temp_start is not None:
+      args.ensemble_temperature = args.ensemble_temp_start
+    if args.phase25_head_lr is None:
+      args.phase25_head_lr = 1e-5
+    if args.id_gate_lr is None:
+      args.id_gate_lr = 1e-3
+    # Mean-over-batch weight health is softer; allow slightly peakier means
+    if "--max-ensemble-weight" not in sys.argv:
+      args.max_ensemble_weight = 0.55
+    args.no_learnable_ensemble = False
+    if args.resume is None:
+      phase1_best = (
+        args.data_dir.resolve()
+        / "checkpoints"
+        / args.phase1_checkpoint_name
+        / "best.pt"
+      )
+      if not phase1_best.exists():
+        raise SystemExit(
+          f"--v8 needs Phase-1 best.pt at {phase1_best}\n"
+          "Run --v6-phase1 first, or pass --resume <path/to/phase1/best.pt>"
+        )
+      args.resume = phase1_best
+      args.no_init = True
+
   exclusive = [
     name
     for name, flag in [
@@ -618,6 +710,8 @@ def main() -> None:
       "learnable_ensemble": not args.no_learnable_ensemble,
       "ensemble_temperature": args.ensemble_temperature,
       "min_ensemble_weight": args.min_ensemble_weight,
+      "id_gate": bool(args.v8),
+      "id_gate_hidden": int(args.id_gate_hidden),
     }
   )
   model = MaSELiteNet(config).to(device)
@@ -677,7 +771,9 @@ def main() -> None:
     init_info["resume"] = str(resume_path)
 
   phase1_val_gate = args.phase1_val_acc
-  if (args.v6_phase2 or args.v6_phase25 or args.v7) and phase1_val_gate is None:
+  if (
+    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+  ) and phase1_val_gate is None:
     phase1_results = (
       data_dir / "checkpoints" / args.phase1_checkpoint_name / "results.json"
     )
@@ -689,7 +785,16 @@ def main() -> None:
         flush=True,
       )
 
-  if args.v6_phase25:
+  if args.v8:
+    if model.id_gate is None:
+      raise SystemExit("--v8 requires id_gate=True in config")
+    n_gate, n_head = set_v8_id_gate_and_heads(model)
+    print(
+      f"v8 ID-Gate: training id_gate ({n_gate:,}) + "
+      f"heads ({n_head:,}); selector+branches frozen",
+      flush=True,
+    )
+  elif args.v6_phase25:
     if not isinstance(model.ensemble_logits, nn.Parameter):
       raise SystemExit(
         "v6-phase25 requires learnable ensemble_logits "
@@ -725,7 +830,16 @@ def main() -> None:
   else:
     ensemble_lr = args.backbone_lr * 5.0
 
-  if args.v6_phase25:
+  if args.v8:
+    assert model.id_gate is not None
+    optimizer = torch.optim.Adam(
+      [
+        {"params": model.heads.parameters(), "lr": args.phase25_head_lr},
+        {"params": model.id_gate.parameters(), "lr": args.id_gate_lr},
+      ],
+      weight_decay=args.weight_decay,
+    )
+  elif args.v6_phase25:
     optimizer = torch.optim.Adam(
       [
         {"params": model.heads.parameters(), "lr": args.phase25_head_lr},
@@ -833,6 +947,13 @@ def main() -> None:
         "v7: tuned Phase2.5 fused_nll + ent(w) | head_lr=1e-5 ens_ratio=0.15"
       )
       tqdm_desc = "MaSELiteV7"
+    elif args.v8:
+      method = "mase_lite_v8"
+      recipe = "v8"
+      loss_desc = (
+        "v8 ID-Gate: fused_nll + ent(w) | sample-wise w(x) + heads fine-tune"
+      )
+      tqdm_desc = "MaSELiteV8"
     elif args.v6_phase25:
       method = "mase_lite_v6_phase25"
       recipe = "v6_phase25"
@@ -873,6 +994,12 @@ def main() -> None:
     if args.v5:
       ens_mode = (
         f"v5 learnable anti-collapse ens_lr={ensemble_lr:g} "
+        f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
+      )
+    elif args.v8:
+      ens_mode = (
+        f"v8 ID-Gate hidden={args.id_gate_hidden} "
+        f"gate_lr={args.id_gate_lr:g} heads_lr={args.phase25_head_lr:g} "
         f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
       )
     elif args.v6_phase25 or args.v7:
@@ -981,7 +1108,9 @@ def main() -> None:
       " w=[" + ",".join(f"{x:.2f}" for x in ew) + "]" if ew is not None else ""
     )
     health_str = ""
-    if ew is not None and (args.v6_phase2 or args.v6_phase25 or args.v7):
+    if ew is not None and (
+      args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+    ):
       health_str = f"  wh={'ok' if wh['ok'] else 'BAD'}"
     uauc_str = f"  uauc={val_uauc:.3f}" if args.track_val_uauc else ""
     temp_str = ""
@@ -997,7 +1126,7 @@ def main() -> None:
     )
 
     phase_gate_eligible = True
-    if args.v6_phase2 or args.v6_phase25 or args.v7:
+    if args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
       phase_gate_eligible = wh["ok"]
       if phase1_val_gate is not None:
         phase_gate_eligible = phase_gate_eligible and (
@@ -1043,7 +1172,7 @@ def main() -> None:
   final_wh = weight_health(final_ew, min_w=wh_min, max_w=wh_max)
   if args.v5:
     final_wh["rule"] = "ok if min_w>=0.10 and max_w<=0.55"
-  elif args.v6_phase2 or args.v6_phase25 or args.v7:
+  elif args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
     final_wh["rule"] = (
       f"ok if min_w>={wh_min} and max_w<={args.max_ensemble_weight}"
     )
@@ -1054,15 +1183,20 @@ def main() -> None:
       flush=True,
     )
   tp_ahf: dict[str, Any] | None = None
-  if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v7:
+  if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
     tp_ahf = {
       "phase": recipe,
       "phase1_checkpoint_name": args.phase1_checkpoint_name,
       "phase1_val_gate": phase1_val_gate,
       "phase2_ensemble_only": bool(args.phase2_ensemble_only),
       "phase25_unfreeze_heads": bool(args.v6_phase25 and not args.v6_phase2),
-      "phase25_head_lr": args.phase25_head_lr if args.v6_phase25 else None,
+      "phase25_head_lr": (
+        args.phase25_head_lr if (args.v6_phase25 or args.v8) else None
+      ),
       "v7": bool(args.v7),
+      "v8_id_gate": bool(args.v8),
+      "id_gate_lr": args.id_gate_lr if args.v8 else None,
+      "id_gate_hidden": args.id_gate_hidden if args.v8 else None,
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
       "ensemble_temp_start": temp_start,
       "ensemble_temp_end": temp_end,
@@ -1100,7 +1234,12 @@ def main() -> None:
       "phase2_ensemble_only": bool(args.phase2_ensemble_only),
       "v6_phase25": bool(args.v6_phase25 and not args.v7),
       "v7": bool(args.v7),
-      "phase25_head_lr": args.phase25_head_lr if args.v6_phase25 else None,
+      "v8": bool(args.v8),
+      "phase25_head_lr": (
+        args.phase25_head_lr if (args.v6_phase25 or args.v8) else None
+      ),
+      "id_gate_lr": args.id_gate_lr if args.v8 else None,
+      "id_gate_hidden": args.id_gate_hidden if args.v8 else None,
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
       "ensemble_temp_start": temp_start,
       "ensemble_temp_end": temp_end,
@@ -1254,13 +1393,18 @@ def main() -> None:
   )
   if ew := test_m.get("ensemble_weights"):
     print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
-  if final_ew is not None and (args.v5 or args.v6_phase2 or args.v6_phase25 or args.v7):
+  if final_ew is not None and (
+    args.v5 or args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+  ):
     print(
       f"Weight health: min={final_wh['min_w']:.3f} "
-      f"max={final_wh['max_w']:.3f} ok={final_wh['ok']}",
+      f"max={final_wh['max_w']:.3f} ok={final_wh['ok']}"
+      + (" (mean over batch)" if args.v8 else ""),
       flush=True,
     )
-  if (args.v6_phase2 or args.v6_phase25 or args.v7) and phase1_val_gate is not None:
+  if (
+    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+  ) and phase1_val_gate is not None:
     beat = float(test_m["accuracy"]) >= float(phase1_val_gate)
     print(
       f"vs Phase-1 val gate ({phase1_val_gate:.4f}): "
