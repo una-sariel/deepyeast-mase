@@ -1,0 +1,27 @@
+{
+  "method": "mase_tta_eval",
+  "checkpoint": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v11\\deepyeast_full\\checkpoints\\mase_lite_full_v8\\best.pt",
+  "data_dir": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v11\\deepyeast_full",
+  "tta_mode": "flip_rot",
+  "n_views": 7,
+  "seed": 42,
+  "splits": {
+    "val": {
+      "n": 12500,
+      "baseline_accuracy": 0.88864,
+      "mean_mask_coverage": 0.625,
+      "tta_accuracy": 0.89056,
+      "tta_gain_pp": 0.19200000000000328
+    },
+    "test": {
+      "n": 12500,
+      "baseline_accuracy": 0.89032,
+      "mean_mask_coverage": 0.625,
+      "tta_accuracy": 0.89688,
+      "tta_gain_pp": 0.656000000000001
+    }
+  },
+  "test_baseline_accuracy": 0.89032,
+  "test_tta_accuracy": 0.89688,
+  "test_tta_gain_pp": 0.656000000000001
+}

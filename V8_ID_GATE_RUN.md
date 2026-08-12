@@ -199,3 +199,26 @@ Report **train** and **TTA** as separate rows.
 
 > **ID-Gate = learn an input-dependent soft mix of the four MaSE heads, instead of one global mix for the whole dataset.**
 
+---
+
+## Full-data result (seed=42, professor run)
+
+Sources: [`results/v8/results.json`](results/v8/results.json), [`results/v8/tta_summary.json`](results/v8/tta_summary.json).
+
+| Metric | Value |
+|--------|-------|
+| Resume | Phase-1 `best.pt` |
+| Best epoch | **1** (val 88.83%) |
+| **Test (train)** | **89.05%** |
+| Mean w (logged) | `[0.190, 0.218, 0.237, 0.356]` — `weight_health.ok` |
+| **Test + TTA** (`flip_rot`) | **89.69%** (+0.66pp vs v8 baseline in TTA script) |
+| Elapsed | ~9 min |
+
+| Compare | Acc | Δ vs v8 train |
+|---------|-----|---------------|
+| Phase 1 | 88.95% | **+0.10pp** (meets “> Phase-1”) |
+| Phase 2.5 / v7 | 89.07% / 89.06% | ≈ tie (−0.02pp) |
+| v4 train | ≈89.58% | −0.53pp |
+| Phase 2.5 / v7 + TTA | **89.82%** | v8+TTA **89.69%** (−0.13pp) |
+
+**Readout:** ID-Gate is healthy and beats Phase-1 slightly, but **does not beat Phase 2.5 train or the 89.82% TTA SOTA**. Best @ ep1 suggests the gate/heads adapt immediately then overfit; mean w is more peaked than global Phase 2.5 (head4 ≈0.36). Keep v8 as the sample-wise fusion story; accuracy table still leads with **v4 train** / **P2.5+TTA**.

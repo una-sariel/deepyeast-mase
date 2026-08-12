@@ -158,14 +158,16 @@ Paper: Shanmugam et al., ICCV 2021 — [arXiv:2011.11156](https://arxiv.org/abs/
 | v6 Phase 2.5 | 89.07% | +0.12pp vs P1 |
 | v7 | 89.06% | ≈ Phase 2.5 |
 | **Phase 2.5 / v7 + TTA** | **89.82%** | **+0.74pp** vs train; **+0.24pp** vs v4 train |
+| v8 ID-Gate | 89.05% | +0.10pp vs P1; ≈ Phase 2.5 (see [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md)) |
+| v8 + TTA | 89.69% | below P2.5/v7 TTA 89.82% |
 
 ```text
 v4 ≈89.58%
         │
         ▼
 v5 ~89.16% ──► P1 88.95% ──P2──► 89.01% ──P2.5──► 89.07% ──v7──► 89.06%
-                                                                  │
-                                                             TTA  ▼
+                     │                                            │
+                     └── v8 ID-Gate 89.05% ──TTA──► 89.69%        TTA ▼
                                                                89.82%  ··· goal 90%
 ```
 

@@ -8,7 +8,7 @@ Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch
 
 ## Results
 
-JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` … `results/v7`).
+JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` … `results/v8`).
 
 ### Full data (seed=42, 5% init)
 
@@ -17,14 +17,17 @@ JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` 
 | Keras baseline | 88.4% | official |
 | MaSE Lite v2 | 89.1% | uniform; head-mean CE |
 | MaSE Lite v3 | 87.75% | learnable; **collapsed** |
-| MaSE Lite v4 | ≈89.58% | fused-CE + frozen uniform |
+| MaSE Lite v4 | ≈89.58% | fused-CE + frozen uniform (**best train, no TTA**) |
+| v5 | ~89.16% | learnable w; below v4 |
 | v6 Phase 1 | 88.95% | `results/v6/phase1_results.json` |
 | v6 Phase 2.5 | 89.07% | `results/v6/phase25_results.json` |
-| **v6 Phase 2.5 + TTA** | **89.82%** | `results/v6/phase25_tta_summary.json` |
+| **v6 Phase 2.5 + TTA** | **89.82%** | `results/v6/phase25_tta_summary.json` (**best overall**) |
 | v7 | 89.06% | `results/v7/results.json` |
 | **v7 + TTA** | **89.82%** | `results/v7/tta_summary.json` |
+| v8 ID-Gate | 89.05% | `results/v8/results.json` |
+| v8 + TTA | 89.69% | `results/v8/tta_summary.json` |
 
-Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp).
+Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp vs best TTA).
 
 ### 5% pilot (seed=42)
 
