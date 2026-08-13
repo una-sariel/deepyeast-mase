@@ -409,9 +409,29 @@ def main() -> None:
     ),
   )
   parser.add_argument(
+    "--v9",
+    action="store_true",
+    help=(
+      "MaSE Lite v9 Random Spatial Bagging: resume Phase-1; train heads+w "
+      "with per-image random top-k masks (selector/branches frozen). "
+      "Default checkpoint: mase_lite_full_v9"
+    ),
+  )
+  parser.add_argument(
+    "--rsb-samples",
+    type=int,
+    default=16,
+    help="v9: number of random masks to average at RSB eval (default: 16)",
+  )
+  parser.add_argument(
     "--with-tta",
     action="store_true",
     help="After test: TTA eval on best.pt → tta_eval/summary.json",
+  )
+  parser.add_argument(
+    "--with-rsb",
+    action="store_true",
+    help="After test: RSB eval on best.pt → rsb_eval/summary.json (auto with --v9)",
   )
   parser.add_argument(
     "--phase25-head-lr",
@@ -485,8 +505,8 @@ def main() -> None:
     args.no_init = True
 
   if args.v7:
-    if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v8:
-      raise SystemExit("--v7 cannot combine with --v6-phase1/2/25 or --v8")
+    if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v8 or args.v9:
+      raise SystemExit("--v7 cannot combine with --v6-phase1/2/25 or --v8/--v9")
     args.v6_phase25 = True
 
   tp_phase_flags = [
@@ -494,10 +514,11 @@ def main() -> None:
     args.v6_phase2,
     args.v6_phase25,
     args.v8,
+    args.v9,
   ]
   if sum(bool(x) for x in tp_phase_flags) > 1:
     raise SystemExit(
-      "Use only one of --v6-phase1, --v6-phase2, --v6-phase25, --v8 per run"
+      "Use only one of --v6-phase1, --v6-phase2, --v6-phase25, --v8, --v9 per run"
     )
   if args.v6_phase2 and args.freeze_ensemble:
     raise SystemExit("--v6-phase2 conflicts with --freeze-ensemble")
@@ -505,12 +526,16 @@ def main() -> None:
     raise SystemExit("--v6-phase25 conflicts with --freeze-ensemble")
   if args.v8 and args.freeze_ensemble:
     raise SystemExit("--v8 conflicts with --freeze-ensemble")
+  if args.v9 and args.freeze_ensemble:
+    raise SystemExit("--v9 conflicts with --freeze-ensemble")
   if args.v6_phase2 and args.legacy_v2_loss:
     raise SystemExit("--v6-phase2 requires fused-CE (do not use --legacy-v2-loss)")
   if args.v6_phase25 and args.legacy_v2_loss:
     raise SystemExit("--v6-phase25 requires fused-CE (do not use --legacy-v2-loss)")
   if args.v8 and args.legacy_v2_loss:
     raise SystemExit("--v8 requires fused-CE (do not use --legacy-v2-loss)")
+  if args.v9 and args.legacy_v2_loss:
+    raise SystemExit("--v9 requires fused-CE (do not use --legacy-v2-loss)")
 
   if args.v6_phase1:
     args.freeze_ensemble = True
@@ -658,6 +683,53 @@ def main() -> None:
       args.resume = phase1_best
       args.no_init = True
 
+  if args.v9:
+    # Random Spatial Bagging fine-tune (RF-style per-image random masks)
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_full_v9"
+    if args.epochs == 60:
+      args.epochs = 15
+    if args.patience == 15:
+      args.patience = 5
+    if args.min_ensemble_weight == 0.05:
+      args.min_ensemble_weight = 0.15
+    if args.ensemble_entropy_weight == 0.0:
+      args.ensemble_entropy_weight = 0.02
+    if args.aux_head_weight == 0.5:
+      args.aux_head_weight = 0.0
+    if args.distill_weight == 0.1:
+      args.distill_weight = 0.0
+    if args.mask_sparsity_weight == 0.05:
+      args.mask_sparsity_weight = 0.0
+    if args.ensemble_temp_start is None:
+      args.ensemble_temp_start = 1.5
+    if args.ensemble_temp_end is None:
+      args.ensemble_temp_end = 1.0
+    if args.ensemble_temperature == 1.0 and args.ensemble_temp_start is not None:
+      args.ensemble_temperature = args.ensemble_temp_start
+    if args.phase25_head_lr is None:
+      args.phase25_head_lr = 1e-5
+    if args.ensemble_lr_ratio is None:
+      args.ensemble_lr_ratio = 0.25
+    if "--max-ensemble-weight" not in sys.argv:
+      args.max_ensemble_weight = 0.55
+    args.no_learnable_ensemble = False
+    args.with_rsb = True
+    if args.resume is None:
+      phase1_best = (
+        args.data_dir.resolve()
+        / "checkpoints"
+        / args.phase1_checkpoint_name
+        / "best.pt"
+      )
+      if not phase1_best.exists():
+        raise SystemExit(
+          f"--v9 needs Phase-1 best.pt at {phase1_best}\n"
+          "Run --v6-phase1 first, or pass --resume <path/to/phase1/best.pt>"
+        )
+      args.resume = phase1_best
+      args.no_init = True
+
   exclusive = [
     name
     for name, flag in [
@@ -712,6 +784,7 @@ def main() -> None:
       "min_ensemble_weight": args.min_ensemble_weight,
       "id_gate": bool(args.v8),
       "id_gate_hidden": int(args.id_gate_hidden),
+      "mask_mode": "random" if args.v9 else "learned",
     }
   )
   model = MaSELiteNet(config).to(device)
@@ -772,7 +845,7 @@ def main() -> None:
 
   phase1_val_gate = args.phase1_val_acc
   if (
-    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8 or args.v9
   ) and phase1_val_gate is None:
     phase1_results = (
       data_dir / "checkpoints" / args.phase1_checkpoint_name / "results.json"
@@ -792,6 +865,19 @@ def main() -> None:
     print(
       f"v8 ID-Gate: training id_gate ({n_gate:,}) + "
       f"heads ({n_head:,}); selector+branches frozen",
+      flush=True,
+    )
+  elif args.v9:
+    if not isinstance(model.ensemble_logits, nn.Parameter):
+      raise SystemExit(
+        "v9 requires learnable ensemble_logits "
+        "(check --no-learnable-ensemble / --freeze-ensemble)"
+      )
+    n_ens, n_head = set_phase25_ensemble_and_heads(model)
+    print(
+      f"v9 RSB: training ensemble_logits ({n_ens:,}) + "
+      f"heads ({n_head:,}); selector+branches frozen; "
+      f"mask_mode=random (per-image top-k)",
       flush=True,
     )
   elif args.v6_phase25:
@@ -836,6 +922,14 @@ def main() -> None:
       [
         {"params": model.heads.parameters(), "lr": args.phase25_head_lr},
         {"params": model.id_gate.parameters(), "lr": args.id_gate_lr},
+      ],
+      weight_decay=args.weight_decay,
+    )
+  elif args.v9:
+    optimizer = torch.optim.Adam(
+      [
+        {"params": model.heads.parameters(), "lr": args.phase25_head_lr},
+        {"params": ens_params, "lr": ensemble_lr},
       ],
       weight_decay=args.weight_decay,
     )
@@ -954,6 +1048,13 @@ def main() -> None:
         "v8 ID-Gate: fused_nll + ent(w) | sample-wise w(x) + heads fine-tune"
       )
       tqdm_desc = "MaSELiteV8"
+    elif args.v9:
+      method = "mase_lite_v9"
+      recipe = "v9"
+      loss_desc = (
+        "v9 RSB: fused_nll + ent(w) | per-image random top-k + heads fine-tune"
+      )
+      tqdm_desc = "MaSELiteV9"
     elif args.v6_phase25:
       method = "mase_lite_v6_phase25"
       recipe = "v6_phase25"
@@ -1000,6 +1101,12 @@ def main() -> None:
       ens_mode = (
         f"v8 ID-Gate hidden={args.id_gate_hidden} "
         f"gate_lr={args.id_gate_lr:g} heads_lr={args.phase25_head_lr:g} "
+        f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
+      )
+    elif args.v9:
+      ens_mode = (
+        f"v9 RSB mask=random heads_lr={args.phase25_head_lr:g} "
+        f"ens_lr={ensemble_lr:g} rsb_R={args.rsb_samples} "
         f"min_w={args.min_ensemble_weight} ent_w={args.ensemble_entropy_weight}"
       )
     elif args.v6_phase25 or args.v7:
@@ -1109,7 +1216,7 @@ def main() -> None:
     )
     health_str = ""
     if ew is not None and (
-      args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+      args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8 or args.v9
     ):
       health_str = f"  wh={'ok' if wh['ok'] else 'BAD'}"
     uauc_str = f"  uauc={val_uauc:.3f}" if args.track_val_uauc else ""
@@ -1126,7 +1233,7 @@ def main() -> None:
     )
 
     phase_gate_eligible = True
-    if args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
+    if args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8 or args.v9:
       phase_gate_eligible = wh["ok"]
       if phase1_val_gate is not None:
         phase_gate_eligible = phase_gate_eligible and (
@@ -1172,7 +1279,7 @@ def main() -> None:
   final_wh = weight_health(final_ew, min_w=wh_min, max_w=wh_max)
   if args.v5:
     final_wh["rule"] = "ok if min_w>=0.10 and max_w<=0.55"
-  elif args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
+  elif args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8 or args.v9:
     final_wh["rule"] = (
       f"ok if min_w>={wh_min} and max_w<={args.max_ensemble_weight}"
     )
@@ -1183,7 +1290,14 @@ def main() -> None:
       flush=True,
     )
   tp_ahf: dict[str, Any] | None = None
-  if args.v6_phase1 or args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8:
+  if (
+    args.v6_phase1
+    or args.v6_phase2
+    or args.v6_phase25
+    or args.v7
+    or args.v8
+    or args.v9
+  ):
     tp_ahf = {
       "phase": recipe,
       "phase1_checkpoint_name": args.phase1_checkpoint_name,
@@ -1191,10 +1305,15 @@ def main() -> None:
       "phase2_ensemble_only": bool(args.phase2_ensemble_only),
       "phase25_unfreeze_heads": bool(args.v6_phase25 and not args.v6_phase2),
       "phase25_head_lr": (
-        args.phase25_head_lr if (args.v6_phase25 or args.v8) else None
+        args.phase25_head_lr
+        if (args.v6_phase25 or args.v8 or args.v9)
+        else None
       ),
       "v7": bool(args.v7),
       "v8_id_gate": bool(args.v8),
+      "v9_rsb": bool(args.v9),
+      "rsb_samples": args.rsb_samples if args.v9 else None,
+      "mask_mode": "random" if args.v9 else "learned",
       "id_gate_lr": args.id_gate_lr if args.v8 else None,
       "id_gate_hidden": args.id_gate_hidden if args.v8 else None,
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
@@ -1235,17 +1354,23 @@ def main() -> None:
       "v6_phase25": bool(args.v6_phase25 and not args.v7),
       "v7": bool(args.v7),
       "v8": bool(args.v8),
+      "v9": bool(args.v9),
       "phase25_head_lr": (
-        args.phase25_head_lr if (args.v6_phase25 or args.v8) else None
+        args.phase25_head_lr
+        if (args.v6_phase25 or args.v8 or args.v9)
+        else None
       ),
       "id_gate_lr": args.id_gate_lr if args.v8 else None,
       "id_gate_hidden": args.id_gate_hidden if args.v8 else None,
+      "rsb_samples": args.rsb_samples if args.v9 else None,
+      "mask_mode": "random" if args.v9 else "learned",
       "ensemble_lr_ratio": args.ensemble_lr_ratio,
       "ensemble_temp_start": temp_start,
       "ensemble_temp_end": temp_end,
       "init": init_info,
       "with_uq": bool(args.with_uq),
       "with_tta": bool(args.with_tta),
+      "with_rsb": bool(args.with_rsb),
       "uq_mc_samples": args.uq_mc_samples if args.with_uq else None,
     },
     "params": n_params,
@@ -1299,6 +1424,51 @@ def main() -> None:
         flush=True,
       )
     print(f"TTA saved: {ckpt_dir / 'tta_eval' / 'summary.json'}", flush=True)
+
+  if args.with_rsb:
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    with (ckpt_dir / "results.json").open("w") as f:
+      json.dump(results, f, indent=2)
+    from eval_mase_rsb import run_rsb_eval  # noqa: E402
+
+    print(
+      f"\n=== RSB eval (R={args.rsb_samples} random masks / image) ===",
+      flush=True,
+    )
+    rsb_payload = run_rsb_eval(
+      data_dir=data_dir,
+      checkpoint=ckpt_dir / "best.pt",
+      results_json=ckpt_dir / "results.json",
+      split="both",
+      rsb_samples=args.rsb_samples,
+      batch_size=args.batch_size,
+      device_pref=args.device,
+      seed=args.seed,
+      out_dir=ckpt_dir / "rsb_eval",
+    )
+    test_rsb = rsb_payload.get("splits", {}).get("test", {})
+    results["rsb"] = {
+      "rsb_samples": args.rsb_samples,
+      "test_random_single": (test_rsb.get("random_single") or {}).get(
+        "accuracy"
+      ),
+      "test_rsb": (test_rsb.get("rsb") or {}).get("accuracy"),
+      "test_learned_single": (test_rsb.get("learned_single") or {}).get(
+        "accuracy"
+      ),
+    }
+    if results["rsb"].get("test_rsb") is not None:
+      print(
+        f"  test: random1={results['rsb']['test_random_single']:.4f}  "
+        f"rsb={results['rsb']['test_rsb']:.4f}"
+        + (
+          f"  learned={results['rsb']['test_learned_single']:.4f}"
+          if results["rsb"].get("test_learned_single") is not None
+          else ""
+        ),
+        flush=True,
+      )
+    print(f"RSB saved: {ckpt_dir / 'rsb_eval' / 'summary.json'}", flush=True)
 
   # PE → AUROC (primary UQ metric = UAUC)
   if args.with_uq:
@@ -1394,7 +1564,12 @@ def main() -> None:
   if ew := test_m.get("ensemble_weights"):
     print(f"Weights:  [{', '.join(f'{x:.3f}' for x in ew)}]", flush=True)
   if final_ew is not None and (
-    args.v5 or args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+    args.v5
+    or args.v6_phase2
+    or args.v6_phase25
+    or args.v7
+    or args.v8
+    or args.v9
   ):
     print(
       f"Weight health: min={final_wh['min_w']:.3f} "
@@ -1402,8 +1577,14 @@ def main() -> None:
       + (" (mean over batch)" if args.v8 else ""),
       flush=True,
     )
+  if args.v9 and results.get("rsb", {}).get("test_rsb") is not None:
+    print(
+      f"RSB test:     {results['rsb']['test_rsb']:.4f} "
+      f"(R={args.rsb_samples})",
+      flush=True,
+    )
   if (
-    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8
+    args.v6_phase2 or args.v6_phase25 or args.v7 or args.v8 or args.v9
   ) and phase1_val_gate is not None:
     beat = float(test_m["accuracy"]) >= float(phase1_val_gate)
     print(

@@ -20,6 +20,7 @@ from masked_net import (
   apply_spatial_mask,
   mcherry_cell_mask,
   mask_sparsity_loss,
+  patch_mask_to_pixels,
 )
 from plcnn_triple_net import (
   BRANCH_DIM,
@@ -38,6 +39,8 @@ class MaSELiteConfig(MaskedModelConfig):
   min_ensemble_weight: float = 0.0
   id_gate: bool = False
   id_gate_hidden: int = 128
+  # "learned" = ViT selector; "random" = per-image random top-k (spatial bagging)
+  mask_mode: str = "learned"
 
 
 MASE_LITE_DEFAULT = MaSELiteConfig(
@@ -51,6 +54,7 @@ MASE_LITE_DEFAULT = MaSELiteConfig(
   min_ensemble_weight=0.0,
   id_gate=False,
   id_gate_hidden=128,
+  mask_mode="learned",
 )
 
 
@@ -100,11 +104,40 @@ class MaSELiteNet(nn.Module):
       nn.init.zeros_(self.id_gate[-1].weight)
       nn.init.zeros_(self.id_gate[-1].bias)
 
+  def _random_topk_patch_mask(
+    self, x: torch.Tensor
+  ) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-image random top-k patch mask (RF-style spatial bagging).
+
+    Each sample in the batch draws an independent random subset of patches.
+    This is intentionally *not* one shared region for the whole dataset.
+    """
+    cfg = self.config
+    b = x.shape[0]
+    grid = cfg.image_size // cfg.patch_size
+    n_patches = grid * grid
+    k = cfg.top_k_patches
+    if k is None:
+      raise ValueError("random mask_mode requires top_k_patches")
+    k = min(int(k), n_patches)
+    scores = torch.rand(b, n_patches, device=x.device, dtype=x.dtype)
+    _, idx = torch.topk(scores, k, dim=-1)
+    patch_flat = torch.zeros(b, n_patches, device=x.device, dtype=x.dtype)
+    patch_flat.scatter_(1, idx, 1.0)
+    patch_mask = patch_flat.view(b, grid, grid)
+    pixel_mask = patch_mask_to_pixels(patch_mask, cfg.patch_size)
+    return pixel_mask, patch_flat
+
   def _mask_input(
     self, x: torch.Tensor, train: bool
   ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     cfg = self.config
-    mask, patch_probs = self.selector(x, train=train)
+    if cfg.mask_mode == "random":
+      mask, patch_probs = self._random_topk_patch_mask(x)
+    elif cfg.mask_mode == "learned":
+      mask, patch_probs = self.selector(x, train=train)
+    else:
+      raise ValueError(f"Unknown mask_mode: {cfg.mask_mode!r}")
     mcherry_prior = None
     if cfg.mcherry_guided:
       mcherry_prior = mcherry_cell_mask(x, cfg.mcherry_threshold)
