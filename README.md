@@ -4,7 +4,7 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **v8 ID-Gate:** [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · **v9 RSB:** [V9_RUN.md](V9_RUN.md) · **v10 SFRM:** [V10_RUN.md](V10_RUN.md) · **Fine-tune log:** [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **v9 vs v10 图解:** [SFRM_explained.html](SFRM_explained.html) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **v8 ID-Gate:** [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · **v9 RSB:** [V9_RUN.md](V9_RUN.md) · **v10 SFRM:** [V10_RUN.md](V10_RUN.md) · **Fine-tune log:** [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
@@ -27,9 +27,10 @@ JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` 
 | v8 ID-Gate | 89.05% | `results/v8/results.json` |
 | v8 + TTA | 89.69% | `results/v8/tta_summary.json` |
 | v9 RSB (R=16) | 86.28% | `results/v9/rsb_summary.json` |
+| v9 random-mask train | 84.87% | `results/v9/results.json` |
 | v9 learned-mask ref | 88.96% | same ckpt, selector on |
 
-Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp vs best TTA).
+Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp vs best TTA). v9/v10 are RF-sketch ablations, not the 90% path. See architecture contrast in [ARCHITECTURE.md §10](ARCHITECTURE.md#10-later-recipes-v8--v9--v10) and [V9_RUN.md](V9_RUN.md) / [V10_RUN.md](V10_RUN.md).
 
 ### 5% pilot (seed=42)
 

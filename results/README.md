@@ -42,7 +42,17 @@ results/
 | **v7 + TTA** | **~89.82%** | `v7/tta_summary.json` |
 | v8 ID-Gate | ~89.05% | `v8/results.json` |
 | v8 + TTA | ~89.69% | `v8/tta_summary.json` |
+| v9 random-mask train | 84.87% | `v9/results.json` |
 | v9 RSB (R=16) | 86.28% | `v9/rsb_summary.json` |
 | v9 learned-mask ref | 88.96% | `v9/rsb_summary.json` |
+
+## 5% accuracy (seed=42)
+
+| Version | Val | Test | JSON |
+|---------|-----|------|------|
+| v4 frozen | 82.7% | **85.87%** | `v4/5pct_results.json` |
+| v10 SFRM bypass S=24 | 83.22% | 85.09% | `v10/5pct_results.json` |
+| v10 7-window vote | — | 84.27% | `v10/5pct_vote_summary.json` |
+| v10 + selector S=16 | 83.68% | 85.71% | `v10/5pct_sel_results.json` |
 
 Other folders (`uq_5pct/`, `uq_10pct/`, `head_contrib_10pct/`, `figs/`) stay as-is.

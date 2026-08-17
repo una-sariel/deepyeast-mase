@@ -358,6 +358,35 @@ Same Lite backbone (selector + PLCNN triple + 4 heads). Only the **mask** and **
 | **v9** | **per-image random** 40/64 patches | global `w`, heads FT from Phase-1 | feature bagging + vote | [V9_RUN.md](V9_RUN.md) |
 | **v10** | **one shared** \(S\times S\) hole per train epoch | v4 frozen `w=0.25` | weak shared-subspace sketch | [V10_RUN.md](V10_RUN.md) |
 
-v9 random mask (`mask_mode="random"`): each image draws an independent patch subset; test averages R Softmax views. Not sklearn RandomForest; one `best.pt`.
+v9 (`mask_mode="random"`): each image draws an independent patch subset; test averages R Softmax views. Not sklearn RandomForest; one `best.pt`. Full-data **RSB 86.28%** vs learned-mask **88.96%** on the same ckpt ([results/v9](results/v9/)).
 
-v10 (`--v10` / `--sfrm`): all train images share one window that epoch; val/test unmasked. Professor full-data command is in [V10_RUN.md](V10_RUN.md).
+v10 (`--v10` / `--sfrm`): all train images share one window that epoch; val/test unmasked. 5% unmasked **85.09%** (bypass) / **85.71%** (keep selector) vs 5% v4 **85.87%** ([results/v10](results/v10/)). Professor full-data command: [V10_RUN.md](V10_RUN.md).
+
+```mermaid
+flowchart TB
+  subgraph v9arch [v9 RSB · per-image bagging]
+    X9["image x"]
+    R1["random 40/64 patches"]
+    R2["another random 40/64"]
+    CNN9["same MaSE weights"]
+    A9["mean Softmax  R=16"]
+    X9 --> R1 --> CNN9 --> A9
+    X9 --> R2 --> CNN9
+  end
+  subgraph v10arch [v10 SFRM · shared region]
+    E["epoch t: sample one window"]
+    ALL["zero that window on ALL train images"]
+    CNN10["MaSE v4 frozen w"]
+    VT["val/test: full image, no hole"]
+    E --> ALL --> CNN10
+    CNN10 --> VT
+  end
+```
+
+| | **v9** | **v10** |
+|--|--------|---------|
+| Who shares the mask? | **Nobody** — each image independent | **Whole train set** that epoch |
+| Unit | 40 random **patches** | one \(S\times S\) **pixel** hole (default 24) |
+| Test | R random views, average | unmasked (vote optional, 5% **hurt**) |
+| Train recipe | Phase-1, heads+`w` | v4 frozen \(w=0.25\) |
+| Best reported | full RSB **86.28%** | 5% **85.71%** (+selector) |

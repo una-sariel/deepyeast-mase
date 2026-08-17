@@ -9,9 +9,28 @@
 | 何时 | 每个 forward | **每个 train epoch 换一次窗** |
 | Val / test | 随机 mask / RSB 平均 | **不遮挡**（全图） |
 | 配方 | Phase-1 微调 heads+`w` | **v4 frozen \(w=0.25\)**，默认关掉 selector |
-| 已有结果 | 全量 RSB **86.28%** | 5% unmasked **85.09%** / +selector **85.71%**（均低于 5% v4 **85.87%**） |
+| 已有结果 | 全量 RSB **86.28%**（learned 对照 88.96%） | 5% unmasked **85.09%** / +selector **85.71%**（5% v4 **85.87%**） |
 
 **仍是单模型。** `--v10` = `--sfrm`。不要和 `--v9` 同时开。
+
+### 架构差在哪
+
+```mermaid
+flowchart LR
+  subgraph v9b [v9]
+    A["每张图自己抽 40 个 patch"]
+    B["测试再抽 R 次平均"]
+    A --> B
+  end
+  subgraph v10b [v10]
+    C["这一 epoch 所有训练图挖同一块"]
+    D["val/test 不挖"]
+    C --> D
+  end
+```
+
+v9：空间 **bagging**（样本间 mask 不共享，测试要投票才算主数字）。  
+v10：空间 **共享 Cutout**（样本间 mask 共享，主数字是未遮挡 test）。细节见 [V9_RUN.md](V9_RUN.md)、[ARCHITECTURE.md §10](ARCHITECTURE.md#10-later-recipes-v8--v9--v10)、图解 [SFRM_explained.html](SFRM_explained.html)。
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase
 
@@ -105,7 +124,12 @@ JSON: `results/v10/5pct_results.json`, `results/v10/5pct_vote_summary.json`, `re
 | Metric | v10 bypass S=24 | v10+selector S=16 | 5% v4 |
 |--------|-----------------|-------------------|-------|
 | Best val | 83.22% @ ep49 | **83.68%** @ ep49 | 82.7% |
-| Unmasked test | 85.09% | **85.71%** | **85.87%** |
-| 7-window vote | 84.27% | skipped | — |
+| Unmasked test | **85.09%** | **85.71%** | **85.87%** |
+| 7-window vote test | 84.27% (−0.64pp) | skipped | — |
+| Val mask | 1.000 (bypass) | 0.625 (top-k) | learned top-k |
+| Weights | frozen 0.25×4 | frozen 0.25×4 | frozen 0.25×4 |
+| Elapsed | 257.8 min CPU | 264.9 min CPU | — |
 
-**Readout:** 5% 上没超过 v4。全量仍值得跑一趟作为方法故事；不要预期一定涨点。
+对照 v9 全量（不是 5%，不可直接比）：RSB **86.28%** / learned **88.96%** / random **84.87%**（`results/v9/`）。
+
+**Readout:** 5% 上 v10 没超过 v4（最好 −0.16pp）。投票掉点。全量当方法故事跑即可，不要预期一定涨点。

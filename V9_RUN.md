@@ -78,6 +78,19 @@ Code: `MaSELiteNet._random_topk_patch_mask` in `pytorch/mase_lite_net.py`; RSB l
 
 **Not v9:** one shared \(S\times S\) hole for the whole train set — that is **[v10 SFRM](V10_RUN.md)**.
 
+### v9 vs v10（架构 + 数字）
+
+| | **v9 RSB** | **v10 SFRM** |
+|--|------------|--------------|
+| Mask | 每张图独立 random **40/64 patches** | 整批训练图共用一个 \(S\times S\) **像素窗** |
+| 采样频率 | 每个 forward | 每个 train epoch 一次 |
+| Test | R=16 Softmax 平均 | **全图不遮**（7 窗投票可选） |
+| 配方 | Phase-1 → 微调 heads+`w` | v4 frozen \(w=0.25\)，默认可关 selector |
+| 结果 | 全量 RSB **86.28%**；learned 对照 **88.96%**；random 单次 **84.87%** | 5% bypass **85.09%**（vote 84.27%）；+selector **85.71%**；5% v4 **85.87%** |
+| JSON | `results/v9/` | `results/v10/` |
+
+v9 更像随机森林的 **feature bagging + 投票**；v10 更像老师草图的 **「all image 同一 region」**。两者都是单模型，都没超过 learned selector / v4。图解：[SFRM_explained.html](SFRM_explained.html)。
+
 ---
 
 ## Files to send back

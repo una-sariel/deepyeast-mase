@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SFRM · 共享随机区域遮挡 + 多窗投票</title>
+  <title>v9 RSB vs v10 SFRM · DeepYeast MaSE</title>
   <style>
     :root {
       --ink: #1a1f24;
@@ -165,23 +165,54 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>共享随机区域遮挡 + 多窗投票</h1>
-      <p class="meta">SFRM = Shared-Fixed-Region Mask · DeepYeast / MaSE 语境说明</p>
-      <p class="meta">把老师草图里的「Random Forest + 随机遮一块」收成可实现的训练/推理协议</p>
+      <h1>v9 RSB vs v10 SFRM</h1>
+      <p class="meta">老师「随机森林 + 随机遮盖」的两个实现 · DeepYeast / MaSE</p>
+      <p class="meta">v9 = 每张图独立随机 patch + 投票 · v10 = 整批共用一块区域（原 SFRM）</p>
     </header>
 
     <p class="lede">
-      <strong>一句话：</strong>训练时每个 epoch 抽一个固定大小的矩形窗，<em>该 epoch 内所有训练图都遮同一块</em>；
-      推理时可用「全图 + 多个不同随机窗」多次前向，把概率平均（软投票）。
-      这吸收了随机森林的<strong>随机子空间 + 投票</strong>思想，但不必训练真正的 sklearn RF，也不必存很多份网络权重。
+      <strong>一句话：</strong>v9 学随机森林的 <em>feature bagging + 投票</em>（每张图不同 mask，测试平均 R 次）；
+      v10 学草图的 <em>all image 同一 region</em>（每个 epoch 所有训练图挖同一块，测试不挖）。
+      都是<strong>一份</strong> CNN 权重，不是 sklearn RF。
     </p>
+
+    <section id="results">
+      <h2>已有结果</h2>
+      <table>
+        <tr><th></th><th>v9（全量，老师机器）</th><th>v10（5%，本机）</th><th>对照</th></tr>
+        <tr>
+          <td>主数字</td>
+          <td><strong>RSB 86.28%</strong>（R=16）</td>
+          <td>bypass <strong>85.09%</strong>；+selector <strong>85.71%</strong></td>
+          <td>全量 v4 ≈89.58% / P2.5+TTA <strong>89.82%</strong>；5% v4 <strong>85.87%</strong></td>
+        </tr>
+        <tr>
+          <td>其它</td>
+          <td>random 单次 84.87%；learned 对照 88.96%</td>
+          <td>bypass val 83.22%；vote 84.27%（掉点）；+sel val 83.68%</td>
+          <td>v9 learned ≈ Phase-1；v10 5% 未超过 v4</td>
+        </tr>
+        <tr>
+          <td>权重</td>
+          <td>w≈[0.21, 0.22, 0.24, 0.33]，health ok</td>
+          <td>frozen 0.25×4</td>
+          <td></td>
+        </tr>
+      </table>
+      <div class="callout">
+        <strong>读数：</strong>v9 的 RSB 低于同一 ckpt 的 learned selector（−2.7pp）。
+        v10 5% 最好一档仍低于 v4（−0.16pp）。都是方法故事，不是 90% 主线。
+      </div>
+    </section>
 
     <nav class="toc">
       <strong>目录</strong>
       <ol>
+        <li><a href="#results">已有结果</a></li>
+        <li><a href="#diff">v9 vs v10 架构</a></li>
         <li><a href="#why">为什么要这样改写老师的想法</a></li>
-        <li><a href="#sfrm">SFRM：共享随机区域遮挡（训练）</a></li>
-        <li><a href="#vote">多窗投票（推理，单模型）</a></li>
+        <li><a href="#sfrm">v10 SFRM：共享随机区域遮挡（训练）</a></li>
+        <li><a href="#vote">v10 多窗投票（推理）</a></li>
         <li><a href="#bag">真·袋装 vs 多窗投票</a></li>
         <li><a href="#vs">和 MaSE selector / Flip-TTA 的差别</a></li>
         <li><a href="#hyper">推荐超参与伪代码</a></li>
@@ -189,6 +220,21 @@
         <li><a href="#faq">常见疑问</a></li>
       </ol>
     </nav>
+
+    <section id="diff">
+      <h2>v9 vs v10 架构</h2>
+      <table>
+        <tr><th></th><th>v9 RSB</th><th>v10 SFRM</th></tr>
+        <tr><td>谁共享 mask</td><td><strong>不共享</strong>：每张图独立</td><td><strong>共享</strong>：该 epoch 所有训练图同一窗</td></tr>
+        <tr><td>单位</td><td>随机 40/64 个 patch</td><td>一个 \(S\times S\) 像素洞（默认 24）</td></tr>
+        <tr><td>何时换</td><td>每个 forward</td><td>每个 train epoch 一次</td></tr>
+        <tr><td>测试</td><td>R=16 次随机视野，Softmax 平均</td><td>全图不遮（投票可选，5% 上掉点）</td></tr>
+        <tr><td>RF 类比</td><td>feature bagging + 森林投票</td><td>全体样本共用一个随机子空间</td></tr>
+        <tr><td>训练</td><td>Phase-1，冻 selector/分支，训 heads+w</td><td>v4 frozen w=0.25，默认可关 selector</td></tr>
+        <tr><td>命令</td><td><code>--v9</code></td><td><code>--v10</code></td></tr>
+      </table>
+      <p>草图里的「Random Forest」落到 <strong>v9</strong>；「Random select a region for all image」落到 <strong>v10</strong>。</p>
+    </section>
 
     <!-- 1 -->
     <section id="why">

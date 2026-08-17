@@ -1,6 +1,6 @@
 # MaSE-Net results table (draft for paper / report)
 
-Last local update: 2026-07-27. Full-data cells filled from professor runs when JSON arrives.
+Last local update: 2026-08-17. v9 full-data and v10 5% filled.
 
 ## Accuracy
 
