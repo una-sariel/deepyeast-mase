@@ -18,6 +18,10 @@ results/
   v8/
     results.json               # full data, ID-Gate
     tta_summary.json           # TTA on v8 best.pt
+  sfrm/
+    5pct_results.json          # 5% SFRM (v4 frozen + shared-region mask)
+    5pct_vote_summary.json     # 7-window vote eval
+    5pct_sel_results.json      # 5% SFRM + keep selector, S=16
   uq_5pct/  uq_10pct/  head_contrib_10pct/  figs/
 ```
 

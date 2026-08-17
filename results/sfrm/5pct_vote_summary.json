@@ -1,0 +1,65 @@
+{
+  "method": "mase_sfrm_vote_eval",
+  "checkpoint": "C:\\Users\\unaliuqw\\deepyeast_5pct\\checkpoints\\mase_lite_5pct_sfrm\\best.pt",
+  "data_dir": "C:\\Users\\unaliuqw\\deepyeast_5pct",
+  "sfrm_size": 24,
+  "sfrm_windows": [
+    [
+      3,
+      31,
+      24
+    ],
+    [
+      26,
+      17,
+      24
+    ],
+    [
+      17,
+      35,
+      24
+    ],
+    [
+      3,
+      28,
+      24
+    ],
+    [
+      8,
+      3,
+      24
+    ],
+    [
+      21,
+      40,
+      24
+    ],
+    [
+      30,
+      31,
+      24
+    ]
+  ],
+  "seed": 42,
+  "splits": {
+    "val": {
+      "n": 626,
+      "baseline_accuracy": 0.8338658146964856,
+      "sfrm_vote_accuracy": 0.8194888178913738,
+      "sfrm_vote_gain_pp": -1.437699680511173,
+      "n_windows": 7,
+      "n_views": 8
+    },
+    "test": {
+      "n": 623,
+      "baseline_accuracy": 0.8491171749598716,
+      "sfrm_vote_accuracy": 0.8426966292134831,
+      "sfrm_vote_gain_pp": -0.6420545746388506,
+      "n_windows": 7,
+      "n_views": 8
+    }
+  },
+  "test_baseline_accuracy": 0.8491171749598716,
+  "test_sfrm_vote_accuracy": 0.8426966292134831,
+  "test_sfrm_vote_gain_pp": -0.6420545746388506
+}

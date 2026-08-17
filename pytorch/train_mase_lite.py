@@ -34,6 +34,7 @@ from mase_lite_net import (  # noqa: E402
   load_partial_state,
   predictive_entropy,
 )
+from sfrm import apply_region_zero, sample_window  # noqa: E402
 
 
 def set_seed(seed: int) -> None:
@@ -100,6 +101,7 @@ def run_epoch(
   aux_head_weight: float = 0.5,
   distill_weight: float = 0.1,
   ensemble_entropy_weight: float = 0.0,
+  sfrm_window: tuple[int, int, int] | None = None,
 ) -> dict[str, Any]:
   train = optimizer is not None
   model.train(train)
@@ -108,6 +110,9 @@ def run_epoch(
   for images, labels in loader:
     images = images.to(device, non_blocking=True)
     labels = labels.to(device, non_blocking=True)
+    if train and sfrm_window is not None:
+      r, c, s = sfrm_window
+      images = apply_region_zero(images, r, c, s)
 
     if train:
       optimizer.zero_grad(set_to_none=True)
@@ -434,6 +439,32 @@ def main() -> None:
     help="After test: RSB eval on best.pt → rsb_eval/summary.json (auto with --v9)",
   )
   parser.add_argument(
+    "--sfrm",
+    action="store_true",
+    help=(
+      "Shared-fixed-region mask: one random SxS window per train epoch, "
+      "applied to all training images. Val/test stay unmasked. "
+      "Default: bypass learned selector (v4 frozen-w recipe)."
+    ),
+  )
+  parser.add_argument(
+    "--sfrm-size",
+    type=int,
+    default=24,
+    help="SFRM window side length in pixels (default 24)",
+  )
+  parser.add_argument(
+    "--sfrm-keep-selector",
+    action="store_true",
+    help="Keep learned selector together with SFRM (default: bypass selector)",
+  )
+  parser.add_argument(
+    "--sfrm-windows",
+    type=int,
+    default=7,
+    help="After test: multi-window vote views (plus full image). 0 = skip",
+  )
+  parser.add_argument(
     "--phase25-head-lr",
     type=float,
     default=None,
@@ -536,6 +567,8 @@ def main() -> None:
     raise SystemExit("--v8 requires fused-CE (do not use --legacy-v2-loss)")
   if args.v9 and args.legacy_v2_loss:
     raise SystemExit("--v9 requires fused-CE (do not use --legacy-v2-loss)")
+  if args.v9 and args.sfrm:
+    raise SystemExit("--v9 conflicts with --sfrm (use RSB or SFRM, not both)")
 
   if args.v6_phase1:
     args.freeze_ensemble = True
@@ -756,6 +789,23 @@ def main() -> None:
     if args.checkpoint_name == "mase_lite_full_v3":
       args.checkpoint_name = "mase_lite_full_v5"
 
+  if args.sfrm:
+    if not (
+      args.v5
+      or args.v6_phase1
+      or args.v6_phase2
+      or args.v6_phase25
+      or args.v7
+      or args.v8
+      or args.v9
+      or args.legacy_v2_loss
+    ):
+      args.freeze_ensemble = True
+    if not args.sfrm_keep_selector and "--mask-sparsity-weight" not in sys.argv:
+      args.mask_sparsity_weight = 0.0
+    if args.checkpoint_name == "mase_lite_full_v3":
+      args.checkpoint_name = "mase_lite_5pct_sfrm"
+
   if args.freeze_ensemble:
     args.no_learnable_ensemble = True
     args.min_ensemble_weight = 0.0
@@ -785,6 +835,7 @@ def main() -> None:
       "id_gate": bool(args.v8),
       "id_gate_hidden": int(args.id_gate_hidden),
       "mask_mode": "random" if args.v9 else "learned",
+      "bypass_selector": bool(args.sfrm and not args.sfrm_keep_selector),
     }
   )
   model = MaSELiteNet(config).to(device)
@@ -809,7 +860,9 @@ def main() -> None:
         )
       else:
         print("Init PLCNN: skipped (checkpoint not found)", flush=True)
-      if selector_path is not None:
+      if config.bypass_selector:
+        print("Init selector: skipped (SFRM bypass_selector)", flush=True)
+      elif selector_path is not None:
         loaded = load_partial_state(model, selector_path, prefixes=("selector.",))
         init_info["selector"] = {
           "path": str(selector_path),
@@ -948,16 +1001,23 @@ def main() -> None:
       weight_decay=args.weight_decay,
     )
   else:
-    param_groups: list[dict[str, Any]] = [
-      {"params": model.selector.parameters(), "lr": args.selector_lr},
+    param_groups: list[dict[str, Any]] = []
+    if not config.bypass_selector:
+      param_groups.append(
+        {"params": model.selector.parameters(), "lr": args.selector_lr}
+      )
+    else:
+      for param in model.selector.parameters():
+        param.requires_grad = False
+    param_groups.append(
       {
         "params": list(model.branch_vgg.parameters())
         + list(model.branch_resnet.parameters())
         + list(model.branch_densenet.parameters())
         + list(model.heads.parameters()),
         "lr": args.backbone_lr,
-      },
-    ]
+      }
+    )
     if ens_params and not args.legacy_v2_loss:
       param_groups.append({"params": ens_params, "lr": ensemble_lr})
     optimizer = torch.optim.Adam(param_groups, weight_decay=args.weight_decay)
@@ -1071,10 +1131,17 @@ def main() -> None:
       )
       tqdm_desc = "MaSELiteV5"
     elif args.freeze_ensemble:
-      method = "mase_lite_v4"
-      recipe = "v4"
-      loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
-      tqdm_desc = "MaSELiteV4"
+      method = "mase_lite_sfrm" if args.sfrm else "mase_lite_v4"
+      recipe = "sfrm" if args.sfrm else "v4"
+      if args.sfrm:
+        loss_desc = (
+          f"SFRM S={args.sfrm_size} + fused_nll + aux + kl | frozen w=0.25 | "
+          f"selector={'on' if args.sfrm_keep_selector else 'bypass'}"
+        )
+        tqdm_desc = "MaSELiteSFRM"
+      else:
+        loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
+        tqdm_desc = "MaSELiteV4"
     elif args.no_learnable_ensemble:
       # Same math as v4; keep explicit --freeze-ensemble for reporting
       method = "mase_lite_v4"
@@ -1134,6 +1201,14 @@ def main() -> None:
     f"test={len(test_loader.dataset)} | data={data_dir}",
     flush=True,
   )
+  if args.sfrm:
+    print(
+      f"  SFRM: size={args.sfrm_size}  "
+      f"selector={'keep' if args.sfrm_keep_selector else 'bypass'}  "
+      f"vote_windows={args.sfrm_windows}  "
+      f"(train only; val/test unmasked)",
+      flush=True,
+    )
 
   history: list[dict[str, Any]] = []
   best_val = -1.0
@@ -1167,12 +1242,17 @@ def main() -> None:
       frac = epoch / denom
       t_cur = temp_start + (temp_end - temp_start) * frac
       model.ensemble_temperature = max(float(t_cur), 1e-3)
+    sfrm_window = None
+    if args.sfrm:
+      rng = np.random.default_rng(args.seed + 10007 * (epoch + 1))
+      sfrm_window = sample_window(config.image_size, args.sfrm_size, rng)
     train_m = run_epoch(
       model,
       train_loader,
       device,
       loss_fn,
       optimizer=optimizer,
+      sfrm_window=sfrm_window,
       **epoch_kw,
     )
     val_m = run_epoch(
@@ -1204,6 +1284,8 @@ def main() -> None:
       "select_score": select_score,
       "lr": float(optimizer.param_groups[-1]["lr"]),
     }
+    if sfrm_window is not None:
+      row["sfrm_window"] = list(sfrm_window)
     history.append(row)
     ew = val_m.get("ensemble_weights")
     wh = weight_health(
@@ -1228,7 +1310,12 @@ def main() -> None:
       f"train={train_m['accuracy']:.3f}  "
       f"val={val_m['accuracy']:.3f}  "
       f"mask={val_m['mask_coverage']:.3f}  "
-      f"loss={val_m['loss']:.4f}{uauc_str}{temp_str}{ew_str}{health_str}",
+      f"loss={val_m['loss']:.4f}{uauc_str}{temp_str}{ew_str}{health_str}"
+      + (
+        f"  sfrm=({sfrm_window[0]},{sfrm_window[1]},{sfrm_window[2]})"
+        if sfrm_window is not None
+        else ""
+      ),
       flush=True,
     )
 
@@ -1371,6 +1458,10 @@ def main() -> None:
       "with_uq": bool(args.with_uq),
       "with_tta": bool(args.with_tta),
       "with_rsb": bool(args.with_rsb),
+      "sfrm": bool(args.sfrm),
+      "sfrm_size": args.sfrm_size if args.sfrm else None,
+      "sfrm_keep_selector": bool(args.sfrm_keep_selector) if args.sfrm else None,
+      "sfrm_windows": args.sfrm_windows if args.sfrm else None,
       "uq_mc_samples": args.uq_mc_samples if args.with_uq else None,
     },
     "params": n_params,
@@ -1469,6 +1560,45 @@ def main() -> None:
         flush=True,
       )
     print(f"RSB saved: {ckpt_dir / 'rsb_eval' / 'summary.json'}", flush=True)
+
+  if args.sfrm and args.sfrm_windows > 0:
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    with (ckpt_dir / "results.json").open("w") as f:
+      json.dump(results, f, indent=2)
+    from eval_mase_sfrm import run_sfrm_vote_eval  # noqa: E402
+
+    print(
+      f"\n=== SFRM multi-window vote (S={args.sfrm_size}, "
+      f"M={args.sfrm_windows} + full) ===",
+      flush=True,
+    )
+    vote_payload = run_sfrm_vote_eval(
+      data_dir=data_dir,
+      checkpoint=ckpt_dir / "best.pt",
+      results_json=ckpt_dir / "results.json",
+      split="both",
+      sfrm_size=args.sfrm_size,
+      sfrm_windows=args.sfrm_windows,
+      batch_size=args.batch_size,
+      device_pref=args.device,
+      seed=args.seed,
+      out_dir=ckpt_dir / "sfrm_vote",
+    )
+    results["sfrm_vote"] = {
+      "sfrm_size": args.sfrm_size,
+      "n_windows": args.sfrm_windows,
+      "test_baseline_accuracy": vote_payload.get("test_baseline_accuracy"),
+      "test_sfrm_vote_accuracy": vote_payload.get("test_sfrm_vote_accuracy"),
+      "test_sfrm_vote_gain_pp": vote_payload.get("test_sfrm_vote_gain_pp"),
+    }
+    if results["sfrm_vote"].get("test_sfrm_vote_accuracy") is not None:
+      print(
+        f"  test: baseline={results['sfrm_vote']['test_baseline_accuracy']:.4f}  "
+        f"vote={results['sfrm_vote']['test_sfrm_vote_accuracy']:.4f}  "
+        f"gain={results['sfrm_vote']['test_sfrm_vote_gain_pp']:+.2f}pp",
+        flush=True,
+      )
+    print(f"SFRM vote saved: {ckpt_dir / 'sfrm_vote' / 'summary.json'}", flush=True)
 
   # PE → AUROC (primary UQ metric = UAUC)
   if args.with_uq:

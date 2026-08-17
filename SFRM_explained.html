@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SFRM · 共享随机区域遮挡 + 多窗投票</title>
+  <style>
+    :root {
+      --ink: #1a1f24;
+      --muted: #5a6570;
+      --line: #d8dee6;
+      --bg: #f3f1ec;
+      --card: #ffffff;
+      --accent: #0d5c63;
+      --accent-soft: #e6f2f3;
+      --warm: #b45309;
+      --warm-soft: #fff7ed;
+      --mask: #c2410c;
+      --ok: #166534;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% 0%, #e8f0f0 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 10%, #f0ebe3 0%, transparent 50%),
+        var(--bg);
+      line-height: 1.65;
+    }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 2rem 1.25rem 3.5rem; }
+    header h1 {
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", serif;
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin: 0 0 0.4rem;
+      letter-spacing: -0.02em;
+    }
+    .meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.35rem; }
+    .lede {
+      font-size: 1.02rem;
+      margin: 1rem 0 1.5rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+    }
+    nav.toc {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.9rem 1.1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+    }
+    nav.toc strong { color: var(--accent); }
+    nav.toc ol { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+    nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line); }
+    nav.toc a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.15rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: 1.12rem;
+      margin: 0 0 0.75rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.4rem;
+    }
+    h3 { font-size: 0.98rem; margin: 1rem 0 0.45rem; color: var(--ink); }
+    p, li { font-size: 0.95rem; margin: 0.4rem 0; }
+    ul, ol { padding-left: 1.2rem; margin: 0.4rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.6rem 0;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.45rem 0.55rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--accent-soft); color: var(--accent); }
+    code, .mono {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.84em;
+      background: #eef1f4;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+    pre {
+      background: #1e2933;
+      color: #e8eef2;
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      margin: 0.7rem 0;
+    }
+    pre .c { color: #8b9bab; }
+    .callout {
+      background: var(--warm-soft);
+      border: 1px solid #fdba74;
+      border-radius: 10px;
+      padding: 0.75rem 0.95rem;
+      margin: 0.75rem 0;
+      font-size: 0.9rem;
+    }
+    .callout.ok {
+      background: #ecfdf5;
+      border-color: #86efac;
+    }
+    .fig {
+      margin: 0.9rem 0;
+      padding: 0.75rem;
+      background: #fafaf8;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      text-align: center;
+    }
+    .fig svg { max-width: 100%; height: auto; }
+    .fig-cap {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      text-align: left;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 640px) {
+      .grid2 { grid-template-columns: 1fr; }
+      header h1 { font-size: 1.4rem; }
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      margin-right: 0.35rem;
+    }
+    footer {
+      margin-top: 1.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>共享随机区域遮挡 + 多窗投票</h1>
+      <p class="meta">SFRM = Shared-Fixed-Region Mask · DeepYeast / MaSE 语境说明</p>
+      <p class="meta">把老师草图里的「Random Forest + 随机遮一块」收成可实现的训练/推理协议</p>
+    </header>
+
+    <p class="lede">
+      <strong>一句话：</strong>训练时每个 epoch 抽一个固定大小的矩形窗，<em>该 epoch 内所有训练图都遮同一块</em>；
+      推理时可用「全图 + 多个不同随机窗」多次前向，把概率平均（软投票）。
+      这吸收了随机森林的<strong>随机子空间 + 投票</strong>思想，但不必训练真正的 sklearn RF，也不必存很多份网络权重。
+    </p>
+
+    <nav class="toc">
+      <strong>目录</strong>
+      <ol>
+        <li><a href="#why">为什么要这样改写老师的想法</a></li>
+        <li><a href="#sfrm">SFRM：共享随机区域遮挡（训练）</a></li>
+        <li><a href="#vote">多窗投票（推理，单模型）</a></li>
+        <li><a href="#bag">真·袋装 vs 多窗投票</a></li>
+        <li><a href="#vs">和 MaSE selector / Flip-TTA 的差别</a></li>
+        <li><a href="#hyper">推荐超参与伪代码</a></li>
+        <li><a href="#report">实验怎么报、成功标准</a></li>
+        <li><a href="#faq">常见疑问</a></li>
+      </ol>
+    </nav>
+
+    <!-- 1 -->
+    <section id="why">
+      <h2>1. 为什么要这样改写老师的想法</h2>
+      <p>草图里同时出现了：样本子集、一排「树」、CNN、以及红框里的「Random select a region for all image」。</p>
+      <table>
+        <tr><th>草图元素</th><th>不宜直接做的</th><th>收成的可实现版本</th></tr>
+        <tr>
+          <td>Random Forest</td>
+          <td>在像素上端到端训 sklearn RF，并和 CNN 反传耦合</td>
+          <td>用 <strong>随机空间区域</strong> 模拟「随机特征子集」</td>
+        </tr>
+        <tr>
+          <td>对所有图选同一区域</td>
+          <td>语义模糊（何时选？多大？）</td>
+          <td><strong>每个 epoch 采样一次</strong>，该 epoch 训练集共享</td>
+        </tr>
+        <tr>
+          <td>多棵树 → 多个 Ŷ → Bagging</td>
+          <td>默认训 M 份大 CNN（贵，且与「单模型」冲突）</td>
+          <td>优先：<strong>一个网络 + 多窗推理投票</strong></td>
+        </tr>
+      </table>
+      <div class="callout ok">
+        <strong>定位：</strong>方法/正则消融线，和「可学习 selector」对照；不保证单独冲到 90%，但协议清晰、好写进论文/汇报。
+      </div>
+    </section>
+
+    <!-- 2 -->
+    <section id="sfrm">
+      <h2>2. SFRM：共享随机区域遮挡（训练）</h2>
+      <p><span class="tag">训练期</span>在 \(64\times64\) 图上采样一个边长为 \(S\) 的轴对齐矩形，把窗内两通道像素置 0。</p>
+
+      <div class="fig">
+        <svg viewBox="0 0 740 220" xmlns="http://www.w3.org/2000/svg" aria-label="SFRM epoch diagram">
+          <defs>
+            <pattern id="grid" width="8" height="8" patternUnits="userSpaceOnUse">
+              <path d="M8 0H0V8" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <text x="12" y="22" fill="#0d5c63" font-size="14" font-weight="700">Epoch t：共享窗 (r,c,S) 只采样一次</text>
+          <!-- image A -->
+          <rect x="40" y="45" width="128" height="128" fill="url(#grid)" stroke="#334155" stroke-width="1.5"/>
+          <rect x="72" y="70" width="48" height="48" fill="#c2410c" fill-opacity="0.55" stroke="#9a3412" stroke-width="1.5"/>
+          <text x="104" y="190" text-anchor="middle" font-size="12" fill="#475569">训练图 A</text>
+          <!-- image B -->
+          <rect x="220" y="45" width="128" height="128" fill="url(#grid)" stroke="#334155" stroke-width="1.5"/>
+          <rect x="252" y="70" width="48" height="48" fill="#c2410c" fill-opacity="0.55" stroke="#9a3412" stroke-width="1.5"/>
+          <text x="284" y="190" text-anchor="middle" font-size="12" fill="#475569">训练图 B</text>
+          <!-- image C -->
+          <rect x="400" y="45" width="128" height="128" fill="url(#grid)" stroke="#334155" stroke-width="1.5"/>
+          <rect x="432" y="70" width="48" height="48" fill="#c2410c" fill-opacity="0.55" stroke="#9a3412" stroke-width="1.5"/>
+          <text x="464" y="190" text-anchor="middle" font-size="12" fill="#475569">训练图 C</text>
+          <text x="560" y="90" font-size="13" fill="#0d5c63">同一相对位置</text>
+          <text x="560" y="110" font-size="13" fill="#0d5c63">被抹成 0</text>
+          <text x="560" y="140" font-size="12" fill="#64748b">下一 epoch</text>
+          <text x="560" y="158" font-size="12" fill="#64748b">再抽新的 (r′,c′)</text>
+          <path d="M545 75 H530" stroke="#0d5c63" stroke-width="1.5" marker-end="url(#arrow)"/>
+        </svg>
+        <p class="fig-cap">图 1 · 「共享」指相对坐标相同，不是遮住同一细胞内容。每张图内容不同，但被挖掉的是同一块空间位置。</p>
+      </div>
+
+      <h3>和普通 Cutout 差在哪？</h3>
+      <table>
+        <tr><th></th><th>常见 Cutout</th><th>SFRM（本协议）</th></tr>
+        <tr>
+          <td>窗怎么采</td>
+          <td>每张图 / 每个 batch 各自随机</td>
+          <td><strong>每个 epoch 一次</strong>，训练集共用</td>
+        </tr>
+        <tr>
+          <td>动机</td>
+          <td>强数据增强</td>
+          <td>对齐老师「all image 同一 region」+ RF 式子空间</td>
+        </tr>
+        <tr>
+          <td>Val</td>
+          <td>通常不遮</td>
+          <td><strong>不遮</strong>（对齐主测试：全图）</td>
+        </tr>
+      </table>
+
+      <h3>训练循环（逻辑）</h3>
+      <pre><span class="c"># 每个 epoch 开始</span>
+r = randint(0, 64 - S)
+c = randint(0, 64 - S)
+
+<span class="c"># 该 epoch 所有 train batch</span>
+for x, y in train_loader:
+    x = x.clone()
+    x[:, :, r:r+S, c:c+S] = 0   <span class="c"># 两通道一起遮</span>
+    loss = criterion(model(x), y)
+    ...
+
+<span class="c"># 验证：不遮</span>
+val_acc = evaluate(model, val_loader, mask=None)</pre>
+    </section>
+
+    <!-- 3 -->
+    <section id="vote">
+      <h2>3. 多窗投票（推理，单模型）</h2>
+      <p><span class="tag">推理期 · 可选</span>仍然只有 <strong>一份</strong> <code>best.pt</code>。对每张测试图做多次前向，再平均概率。</p>
+
+      <div class="fig">
+        <svg viewBox="0 0 740 260" xmlns="http://www.w3.org/2000/svg" aria-label="multi-window voting">
+          <text x="12" y="22" fill="#0d5c63" font-size="14" font-weight="700">测试图 x → 多视图 → 概率平均 → ŷ</text>
+          <!-- center image -->
+          <rect x="20" y="50" width="100" height="100" fill="#f1f5f9" stroke="#334155" stroke-width="1.5"/>
+          <text x="70" y="105" text-anchor="middle" font-size="12" fill="#475569">x</text>
+          <!-- arrows to views -->
+          <path d="M130 80 H170" stroke="#64748b" stroke-width="1.5"/>
+          <path d="M130 100 H170" stroke="#64748b" stroke-width="1.5"/>
+          <path d="M130 120 H170" stroke="#64748b" stroke-width="1.5"/>
+          <!-- view boxes -->
+          <rect x="175" y="40" width="70" height="50" fill="#fff" stroke="#0d5c63" stroke-width="1.5"/>
+          <text x="210" y="70" text-anchor="middle" font-size="11" fill="#0d5c63">全图</text>
+          <rect x="175" y="100" width="70" height="50" fill="#fff" stroke="#c2410c" stroke-width="1.5"/>
+          <rect x="195" y="112" width="22" height="22" fill="#c2410c" fill-opacity="0.5"/>
+          <text x="210" y="165" text-anchor="middle" font-size="10" fill="#64748b">窗1</text>
+          <rect x="175" y="180" width="70" height="50" fill="#fff" stroke="#c2410c" stroke-width="1.5"/>
+          <rect x="210" y="198" width="22" height="22" fill="#c2410c" fill-opacity="0.5"/>
+          <text x="210" y="245" text-anchor="middle" font-size="10" fill="#64748b">窗2 … 窗M</text>
+          <!-- model -->
+          <rect x="300" y="95" width="100" height="70" rx="8" fill="#e6f2f3" stroke="#0d5c63" stroke-width="1.5"/>
+          <text x="350" y="135" text-anchor="middle" font-size="13" font-weight="700" fill="#0d5c63">同一 CNN</text>
+          <path d="M245 65 H300" stroke="#64748b" stroke-width="1.2"/>
+          <path d="M245 125 H300" stroke="#64748b" stroke-width="1.2"/>
+          <path d="M245 205 H320 V165" stroke="#64748b" stroke-width="1.2" fill="none"/>
+          <!-- probs -->
+          <text x="450" y="80" font-size="12" fill="#334155">p₀ = softmax(f(x))</text>
+          <text x="450" y="105" font-size="12" fill="#334155">p₁ = softmax(f(mask₁(x)))</text>
+          <text x="450" y="130" font-size="12" fill="#334155">p₂ = softmax(f(mask₂(x)))</text>
+          <text x="450" y="155" font-size="12" fill="#64748b">…</text>
+          <rect x="450" y="175" width="260" height="50" rx="8" fill="#fff7ed" stroke="#b45309" stroke-width="1.5"/>
+          <text x="580" y="197" text-anchor="middle" font-size="12" fill="#b45309">p̄ = (p₀+…+p_M)/(M+1)</text>
+          <text x="580" y="215" text-anchor="middle" font-size="12" fill="#b45309">ŷ = argmax(p̄)</text>
+        </svg>
+        <p class="fig-cap">图 2 · 多窗投票 = 测试时 TTA 的一种；视图是「随机挖洞」而不是翻转。权重文件仍只有一个。</p>
+      </div>
+
+      <h3>具体数字例子（DeepYeast）</h3>
+      <ul>
+        <li>图像 \(64\times64\)，窗边长 \(S=24\)</li>
+        <li>训练：每 epoch 共享一窗（SFRM）</li>
+        <li>测试：1 次全图 + \(M=7\) 次不同随机窗 → 共 8 次 forward，概率平均</li>
+        <li>窗位置用固定随机种子预采样，保证可复现</li>
+      </ul>
+
+      <div class="callout">
+        <strong>和「森林投票」的类比：</strong>每棵「树」≈ 同一网络在某一种遮挡视图下的预测；
+        平均概率 ≈ 软投票。并没有真的训出多棵决策树。
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section id="bag">
+      <h2>4. 真·袋装 vs 多窗投票</h2>
+      <div class="grid2">
+        <div>
+          <h3>多窗投票（优先）</h3>
+          <ul>
+            <li>1 份权重</li>
+            <li>训练成本 ≈ 原来 ×1</li>
+            <li>测试成本 ≈ ×(M+1)</li>
+            <li>符合「单模型」约束</li>
+          </ul>
+        </div>
+        <div>
+          <h3>真 Bagging（可选）</h3>
+          <ul>
+            <li>M 份权重（如 5 个 CNN）</li>
+            <li>训练成本 ≈ ×M</li>
+            <li>每成员可用不同窗序列 / bootstrap 样本</li>
+            <li>更贴草图「一排树」，但更贵</li>
+          </ul>
+        </div>
+      </div>
+      <p>建议汇报口径：先做 <strong>SFRM 训练 + 多窗投票</strong>；只有老师坚持「多模型森林」再上真 Bagging。</p>
+    </section>
+
+    <!-- 5 -->
+    <section id="vs">
+      <h2>5. 和 MaSE selector / Flip-TTA 的差别</h2>
+      <table>
+        <tr><th>机制</th><th>谁决定「看哪 / 不看哪」</th><th>随图变化？</th><th>阶段</th></tr>
+        <tr>
+          <td>MaSE learned selector</td>
+          <td>网络学 patch 重要性（top-k）</td>
+          <td>是（每张图不同）</td>
+          <td>训练+推理（可微）</td>
+        </tr>
+        <tr>
+          <td>SFRM</td>
+          <td>随机固定矩形</td>
+          <td>训练：同 epoch 全员相同；推理多窗：每视图不同</td>
+          <td>增强 / 视图定义</td>
+        </tr>
+        <tr>
+          <td>Flip / rot90 TTA</td>
+          <td>几何变换</td>
+          <td>是（变换后）</td>
+          <td>仅推理</td>
+        </tr>
+      </table>
+      <div class="callout">
+        <strong>消融纪律：</strong>第一版不要把 SFRM 和 learned selector 叠在一起，否则涨跌说不清。
+        先关 selector 测纯 SFRM，再与 MaSE 主结果对照。
+      </div>
+      <p>多窗投票可以和 flip_rot <strong>以后</strong>组合，但算力会相乘；先各自报一行。</p>
+    </section>
+
+    <!-- 6 -->
+    <section id="hyper">
+      <h2>6. 推荐超参与伪代码</h2>
+      <table>
+        <tr><th>项</th><th>推荐默认</th><th>备注</th></tr>
+        <tr><td>图像尺寸</td><td>64×64×2</td><td>DeepYeast</td></tr>
+        <tr><td>窗边长 S</td><td>24</td><td>可扫 16 / 32</td></tr>
+        <tr><td>采样频率</td><td>每 epoch 一次</td><td>比每 batch 更稳、更贴「all image」</td></tr>
+        <tr><td>窗位置</td><td>均匀：r,c ∈ [0, 64−S]</td><td>轴对齐矩形</td></tr>
+        <tr><td>遮挡填充</td><td>0</td><td>两通道同时</td></tr>
+        <tr><td>Val</td><td>不遮</td><td>选 best.pt</td></tr>
+        <tr><td>测试 M</td><td>7 窗 + 1 全图</td><td>可选关投票，只报全图</td></tr>
+        <tr><td>主干</td><td>DeepYeastNet 或 MaSE（关 selector）</td><td>第一版</td></tr>
+      </table>
+
+      <h3>推理伪代码</h3>
+      <pre>windows = [(r_i, c_i) for i in range(M)]  <span class="c"># 固定种子预采样</span>
+probs = []
+probs.append(softmax(model(x)))             <span class="c"># 全图</span>
+for (r, c) in windows:
+    z = x.clone()
+    z[:, :, r:r+S, c:c+S] = 0
+    probs.append(softmax(model(z)))
+y_hat = argmax(mean(probs))</pre>
+    </section>
+
+    <!-- 7 -->
+    <section id="report">
+      <h2>7. 实验怎么报、成功标准</h2>
+      <p>建议至少报两行（与现有 TTA 习惯一致）：</p>
+      <ol>
+        <li><strong>SFRM 训练 → 全图测试</strong>（主协议）</li>
+        <li><strong>SFRM 训练 → 多窗投票测试</strong>（可选增益）</li>
+      </ol>
+      <table>
+        <tr><th>对照</th><th>看什么</th></tr>
+        <tr><td>无遮挡 baseline（同架构）</td><td>SFRM 是否严重掉点</td></tr>
+        <tr><td>Per-image 随机窗（每张图自己的窗）</td><td>「共享」是否必要</td></tr>
+        <tr><td>MaSE learned selector</td><td>方法对照主结果</td></tr>
+      </table>
+      <div class="callout ok">
+        <strong>宽松成功标准（方法验证）：</strong>全图 test 相对 baseline 掉点 ≤ ~0.3pp，或加上多窗投票有小幅提升，且训练稳定。
+        <br/><strong>不要预期：</strong>单靠 SFRM 一定超过 v4 / P2.5+TTA 的 89.8%。
+      </div>
+    </section>
+
+    <!-- 8 -->
+    <section id="faq">
+      <h2>8. 常见疑问</h2>
+      <h3>Q：会不会总挡住细胞？</h3>
+      <p>单个 epoch 可能挡住关键区域，但窗位置跨 epoch 均匀随机；S 太大（如 32）时风险更高，优先 16–24。</p>
+
+      <h3>Q：为什么验证集不遮？</h3>
+      <p>主测试协议是「看全图」。Val 不遮才能选出在全图上最好的 checkpoint；多窗投票是第二行指标。</p>
+
+      <h3>Q：这还算 Random Forest 吗？</h3>
+      <p>算<strong>精神上的</strong> RF（随机子空间 + 投票），不是字面决策树森林。论文/汇报里应写清楚，避免审稿人误解成 sklearn RF。</p>
+
+      <h3>Q：和冲 90% 精度主线什么关系？</h3>
+      <p>并行线。精度主线仍是：强 frozen ckpt（v4 级）→ 极轻量解冻 → flip_rot TTA。SFRM 用来落实老师的 mask/RF 想法并作消融。</p>
+
+      <h3>Q：下一步若要写代码？</h3>
+      <p>在训练循环加 epoch 级 <code>(r,c,S)</code>；在 eval 加 <code>--sfrm-windows N</code>。需要时可再单独做 run 文档给老师机器。</p>
+    </section>
+
+    <footer>
+      DeepYeast MaSE workspace · SFRM explainer · 可直接用浏览器打开本文件
+    </footer>
+  </div>
+</body>
+</html>

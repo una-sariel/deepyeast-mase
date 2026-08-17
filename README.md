@@ -4,11 +4,11 @@
 Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **v8 ID-Gate:** [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · **v9 RSB:** [V9_RUN.md](V9_RUN.md) · **Fine-tune log:** [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **v8 ID-Gate:** [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · **v9 RSB:** [V9_RUN.md](V9_RUN.md) · **SFRM 5%:** [SFRM_5PCT_RUN.md](SFRM_5PCT_RUN.md) · **Fine-tune log:** [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
 
 ## Results
 
-JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` … `results/v8`).
+JSON snapshots by version: [results/README.md](results/README.md) (`results/v2` … `results/v8`, `results/sfrm`).
 
 ### Full data (seed=42, 5% init)
 
@@ -37,8 +37,11 @@ Report **train** and **TTA** as separate rows. Goal 90% still open (~0.18pp vs b
 | MaSE-Net Lite v2 | 82.0% | 85.0% |
 | MaSE-Net Lite v3 (learnable) | — | 86.1% |
 | MaSE-Net Lite v4 (frozen) | 82.7% | **85.9%** |
+| MaSE Lite SFRM (unmasked) | 83.2% | 85.1% |
+| MaSE Lite SFRM + 7-window vote | — | 84.3% |
+| MaSE Lite SFRM + selector (S=16) | 83.7% | 85.7% |
 
-**Run docs:** v6 [V6_RUN.md](V6_RUN.md) / [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md); v7 [V7_RUN.md](V7_RUN.md).
+**Run docs:** v6 [V6_RUN.md](V6_RUN.md) / [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md); v7 [V7_RUN.md](V7_RUN.md); SFRM [SFRM_5PCT_RUN.md](SFRM_5PCT_RUN.md).
 
 ## Download DeepYeast data
 

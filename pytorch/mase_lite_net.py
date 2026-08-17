@@ -41,6 +41,7 @@ class MaSELiteConfig(MaskedModelConfig):
   id_gate_hidden: int = 128
   # "learned" = ViT selector; "random" = per-image random top-k (spatial bagging)
   mask_mode: str = "learned"
+  bypass_selector: bool = False
 
 
 MASE_LITE_DEFAULT = MaSELiteConfig(
@@ -55,6 +56,7 @@ MASE_LITE_DEFAULT = MaSELiteConfig(
   id_gate=False,
   id_gate_hidden=128,
   mask_mode="learned",
+  bypass_selector=False,
 )
 
 
@@ -132,6 +134,12 @@ class MaSELiteNet(nn.Module):
     self, x: torch.Tensor, train: bool
   ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     cfg = self.config
+    if cfg.bypass_selector:
+      b, _, h, w = x.shape
+      grid = cfg.image_size // cfg.patch_size
+      mask = torch.ones(b, h, w, device=x.device, dtype=x.dtype)
+      patch_probs = torch.ones(b, grid * grid, device=x.device, dtype=x.dtype)
+      return x, mask, patch_probs
     if cfg.mask_mode == "random":
       mask, patch_probs = self._random_topk_patch_mask(x)
     elif cfg.mask_mode == "learned":
