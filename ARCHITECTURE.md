@@ -344,3 +344,20 @@ MaSELiteConfig(
 - MSMM multi-head ensemble idea: Ding et al., 2022 (ResNet-34 variant in `train_mase.py`)
 
 For run instructions see [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md).
+
+---
+
+## 10. Later recipes (v8 / v9 / v10)
+
+Same Lite backbone (selector + PLCNN triple + 4 heads). Only the **mask** and **fusion** change.
+
+| Version | Mask | Fusion | RF analogy | Doc |
+|---------|------|--------|------------|-----|
+| v2–v7 | learned top-k selector | global `w` (v4 frozen uniform) | — | this file / [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) |
+| **v8** | learned | sample-wise `w(x)` (ID-Gate) | — | [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) |
+| **v9** | **per-image random** 40/64 patches | global `w`, heads FT from Phase-1 | feature bagging + vote | [V9_RUN.md](V9_RUN.md) |
+| **v10** | **one shared** \(S\times S\) hole per train epoch | v4 frozen `w=0.25` | weak shared-subspace sketch | [V10_RUN.md](V10_RUN.md) |
+
+v9 random mask (`mask_mode="random"`): each image draws an independent patch subset; test averages R Softmax views. Not sklearn RandomForest; one `best.pt`.
+
+v10 (`--v10` / `--sfrm`): all train images share one window that epoch; val/test unmasked. Professor full-data command is in [V10_RUN.md](V10_RUN.md).

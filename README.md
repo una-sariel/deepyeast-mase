@@ -86,6 +86,15 @@ python pytorch/train_mase_lite.py \
 
 Reports `uq.test_AUROC_PE` (PE → AUROC). Softmax baseline is secondary only.
 
+### v9 RSB / v10 SFRM (professor `git pull` then one flag)
+
+```bash
+python pytorch/train_mase_lite.py --data-dir /path/to/deepyeast_full --v9 --seed 42
+python pytorch/train_mase_lite.py --data-dir /path/to/deepyeast_full --v10 --seed 42
+```
+
+See [V9_RUN.md](V9_RUN.md) (RF-style per-image bagging) and [V10_RUN.md](V10_RUN.md) (shared-region mask).
+
 - Reproduce **v2** (89.1%): `--legacy-v2-loss --checkpoint-name mase_lite_full_v2`
 - Reproduce **v3**: default flags without `--freeze-ensemble` / `--v5`
 
@@ -103,6 +112,8 @@ pytorch/
 artifacts/checkpoints_5pct/
 V4_RUN.md
 V6_RUN.md
+V9_RUN.md
+V10_RUN.md
 FULL_DATA_QUICKSTART.md
 ARCHITECTURE.md
 UQ_MC_DROPOUT.md

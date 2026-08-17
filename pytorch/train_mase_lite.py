@@ -470,7 +470,7 @@ def main() -> None:
     help=(
       "MaSE Lite v10 Shared-Fixed-Region Mask (SFRM): alias for --sfrm. "
       "One random SxS window per train epoch on all images. "
-      "Default checkpoint: mase_lite_5pct_v10"
+      "Default checkpoint: mase_lite_full_v10"
     ),
   )
   parser.add_argument(
@@ -815,7 +815,7 @@ def main() -> None:
     if not args.sfrm_keep_selector and "--mask-sparsity-weight" not in sys.argv:
       args.mask_sparsity_weight = 0.0
     if args.checkpoint_name == "mase_lite_full_v3":
-      args.checkpoint_name = "mase_lite_5pct_v10"
+      args.checkpoint_name = "mase_lite_full_v10"
 
   if args.freeze_ensemble:
     args.no_learnable_ensemble = True

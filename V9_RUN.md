@@ -31,6 +31,55 @@ Do **not** use one shared region for all images (that correlates errors).
 
 ---
 
+## Architecture (random forest → v9)
+
+v9 **does not train sklearn RandomForest or many CNNs**. One MaSE Lite weight file. The RF idea is only the **inductive bias**.
+
+| Random forest | v9 Random Spatial Bagging |
+|---------------|---------------------------|
+| One tree | One **random top-k patch mask** on the same CNN |
+| Feature bagging (random subset of coordinates) | Random 40 / 64 patches **per image** (`mask_mode=random`) |
+| Bootstrap sample | Same DeepYeast image; mask changes, not the row |
+| Forest vote | Average **Softmax** over **R=16** independent masks (RSB) |
+| Many `.pkl` trees | **One** `best.pt` (selector + branches frozen; heads + `w` fine-tuned) |
+
+Patch grid: 64×64 image, 8×8 patches → **64** patches. Each forward keeps **k=40** (coverage 0.625), independently for every image in the batch.
+
+```mermaid
+flowchart LR
+  subgraph rf [Random forest analogy]
+    T1["tree 1\nrandom features"]
+    T2["tree 2"]
+    TR["tree R"]
+    VOTE["majority / average"]
+    T1 --> VOTE
+    T2 --> VOTE
+    TR --> VOTE
+  end
+  subgraph v9 [v9 one CNN]
+    X["image x"]
+    M1["random mask 1"]
+    M2["random mask 2"]
+    MR["random mask R"]
+    CNN["MaSE Lite\n(shared weights)"]
+    AVG["mean Softmax"]
+    X --> M1 --> CNN
+    X --> M2 --> CNN
+    X --> MR --> CNN
+    CNN --> AVG
+  end
+```
+
+**Train:** Phase-1 `best.pt` → freeze selector + PLCNN branches → train 4 heads + `ensemble_logits` while every forward draws a **new** per-image random mask.
+
+**Test (primary):** `eval_mase_rsb.py` — R random masks, average probabilities. Also log `random_single` and `learned_single` (turn selector back on, same weights).
+
+Code: `MaSELiteNet._random_topk_patch_mask` in `pytorch/mase_lite_net.py`; RSB loop in `pytorch/eval_mase_rsb.py`.
+
+**Not v9:** one shared \(S\times S\) hole for the whole train set — that is **[v10 SFRM](V10_RUN.md)**.
+
+---
+
 ## Files to send back
 
 ```text
@@ -49,8 +98,8 @@ In `rsb_eval/summary.json` look for `splits.test`:
 ## Paths
 
 ```powershell
-$REPO = "D:\UG Research\DeepYeast\Qiwu\deepyeast-mase-main_v10\deepyeast-mase"
-$DATA = "D:\UG Research\DeepYeast\Qiwu\deepyeast-mase-main_v10\deepyeast_full"
+$REPO = "D:\UG Research\DeepYeast\Qiwu\deepyeast-mase-main_v12\deepyeast-mase"
+$DATA = "D:\UG Research\DeepYeast\Qiwu\deepyeast-mase-main_v12\deepyeast_full"
 cd $REPO
 git pull
 .venv\Scripts\activate
