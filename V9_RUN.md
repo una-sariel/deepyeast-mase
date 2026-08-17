@@ -9,7 +9,7 @@
 | 推理 | 单次遮盖 | 对 **R** 次随机视野 Softmax **平均**（RSB） |
 | 训练 | — | 从 Phase‑1 微调 heads + `w`；selector/分支冻结 |
 
-**仍是单模型**（不是多 seed 重训）。准确率是否超过 Phase‑1 / TTA **待全量验证**；主对照是 learned mask。
+**仍是单模型**（不是多 seed 重训）。全量结果见下方；主对照是 learned mask。
 
 **Repo:** https://github.com/una-sariel/deepyeast-mase
 
@@ -132,6 +132,32 @@ Report **train test** and **RSB test** as separate rows.
 
 ## 「ID-Gate / RSB」不是什么
 
-- **不是**「全体图像遮同一块」——那是草图弱版，已弃用。  
+- **不是**「全体图像遮同一块」——那是草图弱版，已做成 **[v10 SFRM](V10_RUN.md)**（5% 未超过 v4）。  
 - **不是**多棵独立随机森林树重训；是 **一次微调 + 推理时多次随机视野平均**。  
 - Learned MaSE mask 仍是主线；v9 是空间 Bagging **对照 / 增强实验**。
+
+---
+
+## Full-data result (seed=42, professor run, `deepyeast-mase-main_v12`)
+
+Sources: [`results/v9/results.json`](results/v9/results.json), [`results/v9/rsb_summary.json`](results/v9/rsb_summary.json).
+
+Resume Phase-1. Trainable: heads + `w`. `mask_mode=random`. `weight_health.ok` (`w≈[0.208, 0.221, 0.241, 0.330]`).
+
+No epoch beat the Phase-1 val gate (0.8875); random-mask val peaked **85.08%** @ ep4. Trainer test is the last-epoch random-mask forward.
+
+| Metric | Test |
+|--------|------|
+| Random mask (trainer) | 84.87% |
+| Random single (`rsb_eval`) | 84.50% |
+| **RSB (R=16)** | **86.28%** |
+| Same weights + learned selector | **88.96%** |
+
+| Compare | Acc | vs v9 RSB |
+|---------|-----|-----------|
+| Phase 1 | 88.95% | −2.67pp |
+| v4 train | ≈89.58% | −3.30pp |
+| Phase 2.5 / v7 + TTA | **89.82%** | −3.54pp |
+| learned_single (this ckpt) | 88.96% | −2.68pp |
+
+**Readout:** RSB **hurts** vs the learned selector on the same weights. Per-image random top-k is a method story, not an accuracy path. Do not promote v9 over Phase-1 / v4 / P2.5+TTA.

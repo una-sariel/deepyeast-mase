@@ -465,6 +465,15 @@ def main() -> None:
     help="After test: multi-window vote views (plus full image). 0 = skip",
   )
   parser.add_argument(
+    "--v10",
+    action="store_true",
+    help=(
+      "MaSE Lite v10 Shared-Fixed-Region Mask (SFRM): alias for --sfrm. "
+      "One random SxS window per train epoch on all images. "
+      "Default checkpoint: mase_lite_5pct_v10"
+    ),
+  )
+  parser.add_argument(
     "--phase25-head-lr",
     type=float,
     default=None,
@@ -530,6 +539,8 @@ def main() -> None:
     help="Phase-2 weight health: reject best if min(w) below this",
   )
   args = parser.parse_args()
+  if args.v10:
+    args.sfrm = True
   if args.select_by in ("uauc", "acc_uauc"):
     args.track_val_uauc = True
   if args.resume is not None:
@@ -568,7 +579,7 @@ def main() -> None:
   if args.v9 and args.legacy_v2_loss:
     raise SystemExit("--v9 requires fused-CE (do not use --legacy-v2-loss)")
   if args.v9 and args.sfrm:
-    raise SystemExit("--v9 conflicts with --sfrm (use RSB or SFRM, not both)")
+    raise SystemExit("--v9 conflicts with --v10/--sfrm (RSB vs shared-region)")
 
   if args.v6_phase1:
     args.freeze_ensemble = True
@@ -804,7 +815,7 @@ def main() -> None:
     if not args.sfrm_keep_selector and "--mask-sparsity-weight" not in sys.argv:
       args.mask_sparsity_weight = 0.0
     if args.checkpoint_name == "mase_lite_full_v3":
-      args.checkpoint_name = "mase_lite_5pct_sfrm"
+      args.checkpoint_name = "mase_lite_5pct_v10"
 
   if args.freeze_ensemble:
     args.no_learnable_ensemble = True
@@ -1131,14 +1142,14 @@ def main() -> None:
       )
       tqdm_desc = "MaSELiteV5"
     elif args.freeze_ensemble:
-      method = "mase_lite_sfrm" if args.sfrm else "mase_lite_v4"
-      recipe = "sfrm" if args.sfrm else "v4"
+      method = "mase_lite_v10" if args.sfrm else "mase_lite_v4"
+      recipe = "v10" if args.sfrm else "v4"
       if args.sfrm:
         loss_desc = (
-          f"SFRM S={args.sfrm_size} + fused_nll + aux + kl | frozen w=0.25 | "
+          f"v10 SFRM S={args.sfrm_size} + fused_nll + aux + kl | frozen w=0.25 | "
           f"selector={'on' if args.sfrm_keep_selector else 'bypass'}"
         )
-        tqdm_desc = "MaSELiteSFRM"
+        tqdm_desc = "MaSELiteV10"
       else:
         loss_desc = "fused_nll + aux + kl | frozen uniform w=0.25"
         tqdm_desc = "MaSELiteV4"

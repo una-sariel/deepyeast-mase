@@ -1,6 +1,8 @@
-# MaSE Lite SFRM — 5% pilot
+# MaSE Lite **v10** — Shared-Fixed-Region Mask (SFRM) 5% pilot
 
-**SFRM** = Shared-Fixed-Region Mask. Each train epoch samples one \(S\times S\) window and zeros that region on **all** training images. Val/test stay unmasked. Optional eval: average softmax over the full image + \(M\) random windows.
+**v10** is the shared-region version of the professor sketch: each train epoch samples one \(S\times S\) window and zeros that region on **all** training images. Val/test stay unmasked. Optional eval: average softmax over the full image + \(M\) random windows.
+
+`--v10` is an alias for `--sfrm`. Contrast with **v9 RSB** (per-image random top-k, not one shared window).
 
 First 5% recipe: **v4 frozen \(w=0.25\)** + SFRM, **learned selector bypassed** (so SFRM is the only mask).
 
@@ -20,20 +22,20 @@ cd C:\Users\unaliuqw\deepyeast-mase
 
 & $PY pytorch\train_mase_lite.py `
   --data-dir $DATA `
-  --sfrm --sfrm-size 24 --sfrm-windows 7 `
+  --v10 --sfrm-size 24 --sfrm-windows 7 `
   --freeze-ensemble `
   --epochs 60 --patience 15 --batch-size 64 `
   --seed 42 `
-  --checkpoint-name mase_lite_5pct_sfrm
+  --checkpoint-name mase_lite_5pct_v10
 ```
 
-Progress bar: **`MaSELiteSFRM`**. Log line includes `sfrm=(r,c,S)`.
+Progress bar: **`MaSELiteV10`**. Log line includes `sfrm=(r,c,S)`.
 
 Send back:
 
 ```text
-1) <deepyeast_5pct>\checkpoints\mase_lite_5pct_sfrm\results.json
-2) <deepyeast_5pct>\checkpoints\mase_lite_5pct_sfrm\sfrm_vote\summary.json
+1) <deepyeast_5pct>\checkpoints\mase_lite_5pct_v10\results.json
+2) <deepyeast_5pct>\checkpoints\mase_lite_5pct_v10\sfrm_vote\summary.json
 ```
 
 ---
@@ -56,7 +58,7 @@ Send back:
 
 ## 5% results (this machine, 2026-08-13)
 
-JSON: `results/sfrm/5pct_results.json`, `results/sfrm/5pct_vote_summary.json`
+JSON: `results/v10/5pct_results.json`, `results/v10/5pct_vote_summary.json`
 
 | Metric | SFRM | 5% v4 (selector) |
 |--------|------|------------------|
@@ -75,7 +77,7 @@ Trainer unmasked test (batch-mean) is 85.09%; the vote script’s own full-image
 
 ## 5% stacked (selector + S=16, 2026-08-13)
 
-JSON: `results/sfrm/5pct_sel_results.json`
+JSON: `results/v10/5pct_sel_results.json`
 
 Same v4 frozen-\(w\) recipe, but **keep selector** and smaller window (`--sfrm-keep-selector --sfrm-size 16 --sfrm-windows 0`).
 

@@ -18,10 +18,13 @@ results/
   v8/
     results.json               # full data, ID-Gate
     tta_summary.json           # TTA on v8 best.pt
-  sfrm/
-    5pct_results.json          # 5% SFRM (v4 frozen + shared-region mask)
+  v9/
+    results.json               # full data, RSB train (random mask)
+    rsb_summary.json           # R=16 vote vs learned-mask ref
+  v10/
+    5pct_results.json          # 5% v10 SFRM (shared-region, selector bypass)
     5pct_vote_summary.json     # 7-window vote eval
-    5pct_sel_results.json      # 5% SFRM + keep selector, S=16
+    5pct_sel_results.json      # 5% v10 + keep selector, S=16
   uq_5pct/  uq_10pct/  head_contrib_10pct/  figs/
 ```
 
@@ -39,5 +42,7 @@ results/
 | **v7 + TTA** | **~89.82%** | `v7/tta_summary.json` |
 | v8 ID-Gate | ~89.05% | `v8/results.json` |
 | v8 + TTA | ~89.69% | `v8/tta_summary.json` |
+| v9 RSB (R=16) | 86.28% | `v9/rsb_summary.json` |
+| v9 learned-mask ref | 88.96% | `v9/rsb_summary.json` |
 
 Other folders (`uq_5pct/`, `uq_10pct/`, `head_contrib_10pct/`, `figs/`) stay as-is.

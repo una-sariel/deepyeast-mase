@@ -1,0 +1,38 @@
+{
+  "method": "mase_lite_v9_rsb",
+  "checkpoint": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v12\\deepyeast_full\\checkpoints\\mase_lite_full_v9\\best.pt",
+  "data_dir": "D:\\UG Research\\DeepYeast\\Qiwu\\deepyeast-mase-main_v12\\deepyeast_full",
+  "rsb_samples": 16,
+  "seed": 42,
+  "note": "RSB = average Softmax over R per-image random top-k masks (not one shared region for all images).",
+  "splits": {
+    "val": {
+      "random_single": {
+        "accuracy": 0.8352,
+        "n": 12500
+      },
+      "rsb": {
+        "accuracy": 0.8536,
+        "n": 12500,
+        "rsb_samples": 16
+      },
+      "learned_single": {
+        "accuracy": 0.88784
+      }
+    },
+    "test": {
+      "random_single": {
+        "accuracy": 0.84504,
+        "n": 12500
+      },
+      "rsb": {
+        "accuracy": 0.8628,
+        "n": 12500,
+        "rsb_samples": 16
+      },
+      "learned_single": {
+        "accuracy": 0.8896
+      }
+    }
+  }
+}
