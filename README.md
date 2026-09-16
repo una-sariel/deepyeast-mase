@@ -1,14 +1,14 @@
 # MaSE-Net
 
-**MaSE-Net** = **M**asked **S**elective **E**nsemble Network for 12-class yeast protein localization on [DeepYeast](https://doi.org/10.1534/g3.117.043687) fluorescence images.
+**MaSE-Net** = **M**asked **S**elective **E**nsemble Network for 12-class yeast protein localization on DeepYeast fluorescence images [[1]](#references).
 
 Undergraduate research with Dr. K.Y. Liu (CUHK Statistics). PyTorch. Manuscript in preparation.
 
 This repo has three pieces:
 
-1. A faithful reimplementation of the official Keras **DeepYeastNet** (Pärnamaa & Parts, *G3* 2017) on the official 65k / 12.5k / 12.5k split — **88.4%** test accuracy (paper ~89%).
-2. **MaSE-Net**: a ViT-style selector keeps the top 40 of 64 patches so the model has to decide *which spatial regions* drive the label, then mixes VGG / ResNet / DenseNet heads. About **89.6%** without TTA, **89.8%** with TTA. A learned mask beats random spatial bagging (**89.0% vs 86.3%**).
-3. Test-time **MC Dropout** uncertainty: UAUC on predictive entropy = **0.9249**.
+1. A faithful reimplementation of the official Keras **DeepYeastNet** [[1]](#references) on the official 65k / 12.5k / 12.5k split — **88.4%** test accuracy (paper ~89%).
+2. **MaSE-Net**: a ViT-style selector [[3]](#references) keeps the top 40 of 64 patches so the model has to decide *which spatial regions* drive the label, then mixes VGG / ResNet / DenseNet heads in an MSMM-style progressive ensemble [[2]](#references). About **89.6%** without TTA, **89.8%** with TTA [[7]](#references). A learned mask beats random spatial bagging (**89.0% vs 86.3%**; RF-style subset+vote intuition only [[9]](#references)).
+3. Test-time **MC Dropout** [[4]](#references) uncertainty: UAUC on predictive entropy = **0.9249** [[5]](#references) [[6]](#references). v8 uses input-dependent mixing [[8]](#references).
 
 ```mermaid
 flowchart LR
@@ -17,6 +17,18 @@ flowchart LR
   CNN --> HEADS["4 progressive heads"]
   HEADS --> OUT["12-class localization"]
 ```
+
+## References
+
+1. Pärnamaa T, Parts L. Accurate classification of protein subcellular localization from high-throughput microscopy images using deep learning. *G3: Genes, Genomes, Genetics*. 2017. [doi:10.1534/g3.117.043687](https://doi.org/10.1534/g3.117.043687). Official Keras: [tanelp/deepyeast](https://github.com/tanelp/deepyeast).
+2. Ding J, Xu J, Wei J, Tang J, Guo F. A multi-scale multi-model deep neural network via ensemble strategy on high-throughput microscopy image for protein subcellular localization. *Expert Systems with Applications*. 2023;212:118744. [doi:10.1016/j.eswa.2022.118744](https://doi.org/10.1016/j.eswa.2022.118744).
+3. Dosovitskiy A, Beyer L, Kolesnikov A, et al. An image is worth 16×16 words: Transformers for image recognition at scale. *ICLR*. 2021. [arXiv:2010.11929](https://arxiv.org/abs/2010.11929).
+4. Gal Y, Ghahramani Z. Dropout as a Bayesian approximation: representing model uncertainty in deep learning. *ICML*. 2016. [PMLR 48:1050–1059](https://proceedings.mlr.press/v48/gal16.html).
+5. Asgharnezhad H, Shamsi A, Pedramfar S, et al. Objective evaluation of deep uncertainty predictions for COVID-19 detection. *Scientific Reports*. 2022. [doi:10.1038/s41598-022-05052-x](https://doi.org/10.1038/s41598-022-05052-x).
+6. Whata A, Dibeco K, Madzima K, Obagbuwa I. Uncertainty quantification in multi-class image classification using chest X-ray images of COVID-19 and pneumonia. *Frontiers in Artificial Intelligence*. 2024. [doi:10.3389/frai.2024.1410841](https://doi.org/10.3389/frai.2024.1410841).
+7. Shanmugam D, Blalock D, Balakrishnan G, Guttag J. Better aggregation in test-time augmentation. *ICCV*. 2021. [arXiv:2011.11156](https://arxiv.org/abs/2011.11156).
+8. Jacobs RA, Jordan MI, Nowlan SJ, Hinton GE. Adaptive mixtures of local experts. *Neural Computation*. 1991;3(1):79–87. [doi:10.1162/neco.1991.3.1.79](https://doi.org/10.1162/neco.1991.3.1.79).
+9. Breiman L. Random forests. *Machine Learning*. 2001;45:5–32. [doi:10.1023/A:1010933404324](https://doi.org/10.1023/A:1010933404324).
 
 **Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · [V4_RUN.md](V4_RUN.md) · [V5_RUN.md](V5_RUN.md) · [V6_RUN.md](V6_RUN.md) · [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · [V7_RUN.md](V7_RUN.md) · [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · [V9_RUN.md](V9_RUN.md) · [V10_RUN.md](V10_RUN.md) · [results/](results/)
 
