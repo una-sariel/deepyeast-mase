@@ -1,10 +1,24 @@
-# DeepYeast MaSE-Net
+# MaSE-Net
 
-**MaSE-Net** = **M**asked **S**elective **E**nsemble Network  
-Masked patch selector + PLCNN branches + MSMM-style multi-head ensemble (PyTorch only).
+**MaSE-Net** = **M**asked **S**elective **E**nsemble Network for 12-class yeast protein localization on [DeepYeast](https://doi.org/10.1534/g3.117.043687) fluorescence images.
 
-**Repo:** https://github.com/una-sariel/deepyeast-mase  
-**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) · **Full-data:** [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · **v4:** [V4_RUN.md](V4_RUN.md) · **v5:** [V5_RUN.md](V5_RUN.md) · **v6 TP-AHF:** [V6_RUN.md](V6_RUN.md) · **v6 Phase 2.5:** [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · **v7:** [V7_RUN.md](V7_RUN.md) · **v8 ID-Gate:** [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · **v9 RSB:** [V9_RUN.md](V9_RUN.md) · **v10 SFRM:** [V10_RUN.md](V10_RUN.md) · **Fine-tune log:** [FINE_TUNING_V4_TO_V7.md](FINE_TUNING_V4_TO_V7.md) · **Results JSON:** [results/](results/) · **TypeError fix:** [FIX_LABEL_SMOOTHING_RERUN.md](FIX_LABEL_SMOOTHING_RERUN.md)
+Undergraduate research with Dr. K.Y. Liu (CUHK Statistics). PyTorch. Manuscript in preparation.
+
+This repo has three pieces:
+
+1. A faithful reimplementation of the official Keras **DeepYeastNet** (Pärnamaa & Parts, *G3* 2017) on the official 65k / 12.5k / 12.5k split — **88.4%** test accuracy (paper ~89%).
+2. **MaSE-Net**: a ViT-style selector keeps the top 40 of 64 patches so the model has to decide *which spatial regions* drive the label, then mixes VGG / ResNet / DenseNet heads. About **89.6%** without TTA, **89.8%** with TTA. A learned mask beats random spatial bagging (**89.0% vs 86.3%**).
+3. Test-time **MC Dropout** uncertainty: UAUC on predictive entropy = **0.9249**.
+
+```mermaid
+flowchart LR
+  IN["64×64×2\nmCherry + GFP"] --> SEL["Patch selector\n64 → top 40"]
+  SEL --> CNN["VGG / ResNet / DenseNet"]
+  CNN --> HEADS["4 progressive heads"]
+  HEADS --> OUT["12-class localization"]
+```
+
+**Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [FULL_DATA_QUICKSTART.md](FULL_DATA_QUICKSTART.md) · [V4_RUN.md](V4_RUN.md) · [V5_RUN.md](V5_RUN.md) · [V6_RUN.md](V6_RUN.md) · [V6_PHASE25_RUN.md](V6_PHASE25_RUN.md) · [V7_RUN.md](V7_RUN.md) · [V8_ID_GATE_RUN.md](V8_ID_GATE_RUN.md) · [V9_RUN.md](V9_RUN.md) · [V10_RUN.md](V10_RUN.md) · [results/](results/)
 
 ## Results
 
