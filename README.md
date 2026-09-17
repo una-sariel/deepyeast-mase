@@ -4,15 +4,29 @@
 
 Undergraduate research with Dr. K.Y. Liu (CUHK Statistics). PyTorch. Manuscript in preparation.
 
+## What this project is
+
+The task is **image classification**: 12 subcellular locations from two-channel (mCherry + GFP) 64×64 fluorescence images, official split train/val/test = 65k / 12.5k / 12.5k (~90k total). A network can get the class right while using scattered pixels. This repo studies a narrower question: **which spatial patches of the cell the classifier is allowed to use**, and whether a learned region is better than a random one.
+
+Each image is cut into 8×8 = **64** patches. A ViT-style selector [[3]](#references) scores them and keeps a **hard top 40** (~62.5%). Unselected patches are **not** zeroed. They are mixed back with a soft blend α = 0.5:
+
+```
+masked_x = α · x + (1 − α) · (x ⊙ pixel_mask)
+```
+
+so dropped patches are attenuated, not deleted (`pytorch/masked_net.py`). The selector is a spatial rule for this fluorescence-image classifier.
+
+A learned mask is compared with random spatial bagging on the same backbone (**89.0% vs 86.3%**; RF-style subset+vote intuition only [[9]](#references)). Four progressive VGG / ResNet / DenseNet heads are mixed by learned softmax weights [[2]](#references). The head mixture is a training detail; the object of the project is the **region mask**. Test-time **MC Dropout** [[4]](#references) reports how confident those 12-class predictions are (UAUC on predictive entropy = **0.9249** [[5]](#references) [[6]](#references)).
+
 This repo has three pieces:
 
-1. A faithful reimplementation of the official Keras **DeepYeastNet** [[1]](#references) on the official 65k / 12.5k / 12.5k split — **88.4%** test accuracy (paper ~89%).
-2. **MaSE-Net**: a ViT-style selector [[3]](#references) keeps the top 40 of 64 patches so the model has to decide *which spatial regions* drive the label, then mixes VGG / ResNet / DenseNet heads in an MSMM-style progressive ensemble [[2]](#references). About **89.6%** without TTA, **89.8%** with TTA [[7]](#references). A learned mask beats random spatial bagging (**89.0% vs 86.3%**; RF-style subset+vote intuition only [[9]](#references)).
-3. Test-time **MC Dropout** [[4]](#references) uncertainty: UAUC on predictive entropy = **0.9249** [[5]](#references) [[6]](#references). v8 uses input-dependent mixing [[8]](#references).
+1. A faithful reimplementation of the official Keras **DeepYeastNet** [[1]](#references) on the official split — **88.4%** test accuracy (paper ~89%).
+2. **MaSE-Net** as above. About **89.6%** without TTA, **89.8%** with TTA [[7]](#references).
+3. The MC Dropout evaluation. v8 adds input-dependent head mixing [[8]](#references); that gate is an ablation, not the main claim.
 
 ```mermaid
 flowchart LR
-  IN["64×64×2\nmCherry + GFP"] --> SEL["Patch selector\n64 → top 40"]
+  IN["64×64×2\nmCherry + GFP"] --> SEL["Patch selector\n64 → hard top 40\n+ α=0.5 blend"]
   SEL --> CNN["VGG / ResNet / DenseNet"]
   CNN --> HEADS["4 progressive heads"]
   HEADS --> OUT["12-class localization"]
@@ -89,7 +103,7 @@ Details (cache location, re-download, verification): **[FULL_DATA_QUICKSTART.md]
 
 ## Recommended scripts
 
-### v4 (accuracy SOTA)
+### v4 (best train accuracy, no TTA)
 
 ```bash
 python pytorch/train_mase_lite.py \
